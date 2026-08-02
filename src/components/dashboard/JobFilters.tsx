@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Filter, X, ChevronDown, MapPin, Briefcase, Globe, Star, Target, Clock } from 'lucide-react'
+import { Search, Filter, X, ChevronDown, MapPin, Briefcase, Globe, Star, Target, Clock, Bookmark, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { RoleType, ExperienceLevel } from '@/types'
+import { RoleType, ExperienceLevel, AppStatus } from '@/types'
 
 const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'SDE', label: 'Software Engineer' },
@@ -54,10 +54,18 @@ interface Filters {
   remote: boolean
   score: string
   posted: string
+  status: AppStatus | ''
 }
+
+const statusOptions: { value: AppStatus | ''; label: string; icon?: React.ElementType }[] = [
+  { value: '', label: 'All Jobs' },
+  { value: 'SAVED', label: 'Saved', icon: Bookmark },
+  { value: 'APPLIED', label: 'Applied', icon: Send },
+]
 
 function readParams(): Filters {
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+  const status = params.get('status') || ''
   return {
     q: params.get('q') || '',
     roles: (params.get('roles')?.split(',').filter(Boolean) as RoleType[]) || [],
@@ -66,6 +74,7 @@ function readParams(): Filters {
     remote: params.get('remote') === '1',
     score: params.get('score') || '0',
     posted: params.get('posted') || '',
+    status: (['SAVED', 'APPLIED'].includes(status) ? status : '') as AppStatus | '',
   }
 }
 
@@ -78,6 +87,7 @@ function toQuery(f: Filters): string {
   if (f.remote) params.set('remote', '1')
   if (f.score && f.score !== '0') params.set('score', f.score)
   if (f.posted) params.set('posted', f.posted)
+  if (f.status) params.set('status', f.status)
   const s = params.toString()
   return s ? `?${s}` : ''
 }
@@ -103,6 +113,7 @@ export function JobFilters() {
     (filters.remote ? 1 : 0) +
     (filters.score !== '0' ? 1 : 0) +
     (filters.posted ? 1 : 0) +
+    (filters.status ? 1 : 0) +
     (filters.q ? 1 : 0)
 
   const toggleRole = (role: RoleType) => {
@@ -124,7 +135,7 @@ export function JobFilters() {
   }
 
   const clearAllFilters = () => {
-    const empty: Filters = { q: '', roles: [], exp: [], loc: '', remote: false, score: '0', posted: '' }
+    const empty: Filters = { q: '', roles: [], exp: [], loc: '', remote: false, score: '0', posted: '', status: '' }
     commit(empty)
   }
 
@@ -141,6 +152,32 @@ export function JobFilters() {
           placeholder="Search jobs by title, company, skills... (press Enter)"
           className="input pl-10"
         />
+      </div>
+
+      {/* Application status quick filter */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          Tracked:
+        </span>
+        {statusOptions.map((opt) => {
+          const Icon = opt.icon
+          const isActive = filters.status === opt.value
+          return (
+            <button
+              key={opt.value}
+              onClick={() => commit({ ...filters, status: opt.value as AppStatus | '' })}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+                isActive
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              )}
+            >
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              {opt.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Advanced Filters Toggle */}

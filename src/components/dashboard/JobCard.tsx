@@ -1,11 +1,23 @@
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ExternalLink, CheckCircle2, Clock, MapPin, Building2, DollarSign, Star, Target } from 'lucide-react'
-import { formatRelativeTime, getScoreColor } from '@/lib/utils'
+import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target } from 'lucide-react'
+import { formatRelativeTime, getScoreColor, getScoreLabel } from '@/lib/utils'
 import { RoleType, ExperienceLevel } from '@/types'
+import toast from 'react-hot-toast'
+
+const STATUS_META: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
+  SAVED: { label: 'Saved', variant: 'gray' },
+  APPLIED: { label: 'Applied', variant: 'info' },
+  INTERVIEWING: { label: 'Interviewing', variant: 'warning' },
+  OFFER: { label: 'Offer', variant: 'success' },
+  REJECTED: { label: 'Rejected', variant: 'danger' },
+  WITHDRAWN: { label: 'Withdrawn', variant: 'gray' },
+}
 
 export interface Job {
   id: string
@@ -28,16 +40,48 @@ export interface Job {
     matchedSkills: string[]
     missingSkills: string[]
   }
+  applications?: { id: string; status: string }[]
 }
 
 interface JobCardProps {
   job: Job
-  onApply?: (jobId: string) => void
+  /** The user's most recent resume — required to save an application */
+  defaultResumeId?: string | null
+  /** Current application status for this job, if the user has saved it */
+  savedStatus?: string | null
 }
 
-export function JobCard({ job, onApply }: JobCardProps) {
+export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
+  const router = useRouter()
+  const [saving, setSaving] = useState(false)
   const score = job.match?.score || 0
   const hasMatch = !!job.match
+
+  const handleSave = async () => {
+    if (!defaultResumeId) {
+      toast.error('Upload a resume first to save jobs')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, resumeId: defaultResumeId, status: 'SAVED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success('Job saved — track it under Applications')
+        router.refresh()
+      } else {
+        toast.error(data?.error || 'Failed to save job')
+      }
+    } catch {
+      toast.error('Failed to save job')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Card className="card-hover overflow-hidden">
@@ -49,10 +93,15 @@ export function JobCard({ job, onApply }: JobCardProps) {
               <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                 {job.title}
               </h3>
-              {hasMatch && (
-                <Badge className={getScoreColor(score)}>
+              {hasMatch ? (
+                <Badge className={getScoreColor(score)} title={getScoreLabel(score)}>
                   <Target className="w-3 h-3 mr-1" />
                   {score}%
+                </Badge>
+              ) : (
+                <Badge variant="gray" className="flex-shrink-0">
+                  <Target className="w-3 h-3 mr-1" />
+                  No match
                 </Badge>
               )}
             </div>
@@ -146,21 +195,38 @@ export function JobCard({ job, onApply }: JobCardProps) {
             size="sm"
             onClick={() => window.open(job.applyUrl, '_blank', 'noopener,noreferrer')}
             className="flex-1 sm:flex-none"
+            disabled={!job.applyUrl}
+            title={job.applyUrl ? 'Open application page' : 'No application link available'}
           >
             <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
             Apply
           </Button>
-          {onApply && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onApply(job.id)}
-              className="flex-1 sm:flex-none"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-              Save
-            </Button>
-          )}
+          {defaultResumeId &&
+            (savedStatus ? (
+              <Badge
+                variant={STATUS_META[savedStatus]?.variant ?? 'gray'}
+                className="flex-shrink-0 py-1.5 px-2.5"
+                title={`This job is ${(STATUS_META[savedStatus]?.label ?? savedStatus).toLowerCase()} — manage it under Applications`}
+              >
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+                {STATUS_META[savedStatus]?.label ?? savedStatus.toLowerCase()}
+              </Badge>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 sm:flex-none"
+              >
+                {saving ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            ))}
         </div>
       </CardContent>
     </Card>

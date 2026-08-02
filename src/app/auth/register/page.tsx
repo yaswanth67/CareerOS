@@ -8,11 +8,11 @@ import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 
 const registerSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100),
-  email: z.string().email('Invalid email address'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(50),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -36,7 +36,6 @@ export default function RegisterPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '',
-      email: '',
       password: '',
       confirmPassword: '',
     },
@@ -64,7 +63,6 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: data.name,
-          email: data.email,
           password: data.password,
         }),
       })
@@ -79,7 +77,7 @@ export default function RegisterPage() {
       toast.success('Account created! Signing you in...')
 
       const signInResult = await signIn('credentials', {
-        email: data.email,
+        name: data.name,
         password: data.password,
         redirect: false,
       })
@@ -108,26 +106,23 @@ export default function RegisterPage() {
   ]
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 mb-6">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <span className="text-2xl font-bold">JobMatch AI</span>
+          <Link href="/" className="inline-flex justify-center mb-6">
+            <Logo size="lg" />
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create Account</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create your account</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Start matching with your dream job
+            Pick a name and password — that&apos;s all you need to sign in
           </p>
         </div>
 
-        <div className="card p-8">
+        <div className="card p-8 shadow-lg">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
               <label htmlFor="name" className="label">
-                Full Name
+                Name (your login)
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -135,37 +130,15 @@ export default function RegisterPage() {
                   {...register('name')}
                   id="name"
                   type="text"
-                  autoComplete="name"
+                  autoComplete="username"
                   className="input pl-10"
-                  placeholder="John Doe"
+                  placeholder="e.g., buddy"
                   disabled={isLoading}
                   aria-invalid={errors.name ? 'true' : 'false'}
                 />
               </div>
               {errors.name && (
                 <p className="mt-1.5 text-sm text-danger-500">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="email" className="label">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  {...register('email')}
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  className="input pl-10"
-                  placeholder="you@example.com"
-                  disabled={isLoading}
-                  aria-invalid={errors.email ? 'true' : 'false'}
-                />
-              </div>
-              {errors.email && (
-                <p className="mt-1.5 text-sm text-danger-500">{errors.email.message}</p>
               )}
             </div>
 

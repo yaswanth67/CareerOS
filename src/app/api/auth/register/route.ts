@@ -2,25 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 
 const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(50),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().min(1, 'Name is required').max(100).optional(),
 })
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, name } = registerSchema.parse(body)
+    const { name, password } = registerSchema.parse(body)
 
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { name },
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: 'That name is already taken — try another one' },
         { status: 400 }
       )
     }
@@ -29,20 +29,27 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.create({
       data: {
-        email,
-        passwordHash,
         name,
+        passwordHash,
       },
       select: {
         id: true,
-        email: true,
         name: true,
+        email: true,
         createdAt: true,
       },
     })
 
     return NextResponse.json({ user }, { status: 201 })
   } catch (error) {
+    // Unique-constraint race (two registrations with the same name at once)
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'That name is already taken — try another one' },
+        { status: 400 }
+      )
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.errors[0].message },

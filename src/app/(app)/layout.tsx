@@ -4,16 +4,18 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, FileText, Settings, LogOut, User, Menu, X, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, FileText, Settings, ClipboardList, LogOut, User, Menu, X, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/ui/Logo'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Resumes', href: '/resumes', icon: FileText },
+  { name: 'Applications', href: '/applications', icon: ClipboardList },
   { name: 'Preferences', href: '/preferences', icon: Settings },
 ]
 
-export default function DashboardLayout({
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode
@@ -21,6 +23,7 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   return (
@@ -37,17 +40,15 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          collapsed ? '' : 'lg:translate-x-0'
         )}
         aria-label="Sidebar"
       >
         <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 dark:border-gray-700">
-          <Link href="/dashboard" className="flex items-center gap-2 text-primary-600 dark:text-primary-400">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <span className="text-xl font-bold">JobMatch AI</span>
+          <Link href="/dashboard" className="flex items-center">
+            <Logo size="md" />
           </Link>
           <button
             className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -89,9 +90,11 @@ export default function DashboardLayout({
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {session?.user?.name || 'User'}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {session?.user?.email}
-              </p>
+              {session?.user?.email && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {session?.user?.email}
+                </p>
+              )}
             </div>
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -126,13 +129,20 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className={collapsed ? '' : 'lg:pl-64'}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
           <button
-            className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open sidebar"
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+                setCollapsed(c => !c)
+              } else {
+                setSidebarOpen(true)
+              }
+            }}
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
           >
             <Menu className="w-6 h-6" />
           </button>
