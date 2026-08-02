@@ -1,0 +1,59 @@
+{
+  "name": "jobmatch-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_ENV=development next dev -p 3000",
+    "build": "NODE_ENV=production next build",
+    "start": "NODE_ENV=production next start -p 3000",
+    "lint": "eslint .",
+    "setup": "node scripts/setup.mjs",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.21.0",
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.6.0",
+    "@prisma/client": "^5.13.0",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^1.28.0",
+    "mammoth": "^1.8.0",
+    "next": "^16.2.12",
+    "next-auth": "^4.24.7",
+    "pdf-parse": "^1.1.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-hook-form": "^7.84.0",
+    "react-hot-toast": "^2.4.1",
+    "tailwind-merge": "^2.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.12.0",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.12",
+    "postcss": "^8.5.25",
+    "prisma": "^5.13.0",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.7.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "sharp": "^0.35.3",
+    "next": {
+      "postcss": "^8.5.25"
+    }
+  }
+}
