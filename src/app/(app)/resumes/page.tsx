@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { FileText, Trash2, Eye, Loader2, Plus } from 'lucide-react'
+import { FileText, Trash2, Eye, Pencil, Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { EditResumeModal, type EditableResume } from '@/components/resumes/EditResumeModal'
 import { formatDate } from '@/lib/utils'
 import { ParsedResume, RoleType } from '@/types'
 import toast from 'react-hot-toast'
@@ -51,6 +52,7 @@ export default function ResumesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingResume, setEditingResume] = useState<Resume | null>(null)
 
   useEffect(() => {
     if (!session) return
@@ -90,6 +92,15 @@ export default function ResumesPage() {
     } finally {
       setDeletingId(null)
     }
+  }
+
+  const handleSaved = (updated: EditableResume) => {
+    setResumes(resumes.map(r =>
+      r.id === updated.id
+        ? { ...r, title: updated.title, roleType: updated.roleType, skills: updated.skills }
+        : r
+    ))
+    setEditingResume(null)
   }
 
   if (isLoading) {
@@ -153,6 +164,14 @@ export default function ResumesPage() {
                       title={expandedId === resume.id ? 'Hide parsed details' : 'Show parsed details'}
                     >
                       <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingResume(resume)}
+                      title="Edit resume"
+                    >
+                      <Pencil className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -255,6 +274,14 @@ export default function ResumesPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {editingResume && (
+        <EditResumeModal
+          resume={editingResume}
+          onClose={() => setEditingResume(null)}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   )

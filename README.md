@@ -1,4 +1,4 @@
-# JobMatch AI
+# MatchIQ
 
 An AI-powered job matching app that pulls live jobs from real job boards, parses your resume, and uses **AI to score how well you match each job** — with reasoning, matched skills, and missing skills.
 
@@ -80,7 +80,7 @@ npm run dev
 
 Sign in with the seeded account, or register your own:
 
-- **Email:** `buddy@gmail.com`
+- **Name:** `buddy`
 - **Password:** `qwerty@1`
 
 > **macOS / Linux gotcha:** if your shell exports `NODE_ENV=production` or `PORT=…`, `next dev` can misbehave. The `dev` script forces `NODE_ENV=development` and pins port `3000` so this doesn't happen. If you ever run Next directly, use `NODE_ENV=development next dev -p 3000`.
@@ -134,7 +134,7 @@ All routes require a logged-in session (cookie) except `/api/auth/*`.
 ### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Create account `{name, email, password}` → 201 |
+| POST | `/api/auth/register` | Create account `{name, password}` (name is unique login) → 201 |
 | POST | `/api/auth/[...nextauth]` | NextAuth (credentials sign-in) |
 
 ### Jobs
@@ -207,7 +207,7 @@ You should get a `message` JSON with a `thinking` block and a `text` block. The 
 
 ### 2. Sign in
 
-Open `http://localhost:3000/auth/signin` and log in as `buddy@gmail.com` / `qwerty@1`.
+Open `http://localhost:3000/auth/signin` and log in as `buddy` / `qwerty@1`.
 
 ### 3. Trigger a live job fetch
 

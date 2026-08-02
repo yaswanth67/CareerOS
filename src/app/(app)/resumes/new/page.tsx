@@ -24,6 +24,8 @@ export default function ResumeUploadPage() {
   const [parsedData, setParsedData] = useState<ParsedResumeData | null>(null)
   const [step, setStep] = useState<'upload' | 'review' | 'complete'>('upload')
   const [isDragActive, setIsDragActive] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editRoleType, setEditRoleType] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (file: File | undefined) => {
@@ -58,6 +60,8 @@ export default function ResumeUploadPage() {
 
       setUploadProgress(100)
       setParsedData(data.resume)
+      setEditTitle(data.resume.title || '')
+      setEditRoleType(data.resume.roleType || 'SDE')
       setStep('review')
       toast.success('Resume uploaded and parsed!')
     } catch (error) {
@@ -75,8 +79,8 @@ export default function ResumeUploadPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: parsedData.title,
-          roleType: parsedData.roleType,
+          title: editTitle,
+          roleType: editRoleType,
           fileName: parsedData.fileName,
           filePath: parsedData.filePath,
           parsedText: parsedData.parsedText,
@@ -232,13 +236,14 @@ export default function ResumeUploadPage() {
                 <label className="label">Resume Title</label>
                 <input
                   type="text"
-                  defaultValue={parsedData.title}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
                   className="input"
                 />
               </div>
               <div>
                 <label className="label">Role Type</label>
-                <select defaultValue={parsedData.roleType} className="input">
+                <select value={editRoleType} onChange={(e) => setEditRoleType(e.target.value)} className="input">
                   <option value="SDE">Software Engineer</option>
                   <option value="AI_ENGINEER">AI Engineer</option>
                   <option value="ML_ENGINEER">ML Engineer</option>

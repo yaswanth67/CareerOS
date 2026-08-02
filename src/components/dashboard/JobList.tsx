@@ -15,17 +15,28 @@ interface JobListFilters {
   remote?: string
   posted?: string
   score?: string
+  status?: string
 }
 
 type MatchWithResume = Prisma.MatchGetPayload<{
   include: { resume: { select: { id: true; userId: true } } }
 }>
 
-type JobWithMatches = PrismaJob & { matches: MatchWithResume[] }
+type JobWithMatches = PrismaJob & {
+  matches: MatchWithResume[]
+  applications?: { id: string; status: string }[]
+}
 
 async function getJobs(filters: JobListFilters) {
   const user = await getCurrentUser()
-  if (!user) return []
+  if (!user) return { jobs: [], resumeId: undefined }
+
+  // The user's most recent resume is used to save applications from the feed
+  const resume = await prisma.resume.findFirst({
+    where: { userId: user.id },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true },
+  })
 
   const where: Prisma.JobWhereInput = { isActive: true }
 
@@ -35,6 +46,11 @@ async function getJobs(filters: JobListFilters) {
   if (roles?.length) where.roleType = { in: roles }
   if (exp?.length) where.experienceLevel = { in: exp }
   if (filters.remote === '1') where.isRemote = true
+
+  // "Tracked" quick filter: only jobs the user has saved / applied to
+  if (filters.status) {
+    where.applications = { some: { userId: user.id, status: filters.status } }
+  }
 
   const orConditions: Prisma.JobWhereInput[] = []
   if (filters.loc) {
@@ -60,17 +76,23 @@ async function getJobs(filters: JobListFilters) {
   const jobs = (await prisma.job.findMany({
     where,
     orderBy: { postedAt: 'desc' },
-    take: 24,
+    // When filtering by a tracked status, show every matching job
+    take: filters.status ? undefined : 24,
     include: {
       matches: {
         where: { resume: { userId: user.id } },
         include: { resume: { select: { id: true, userId: true } } },
       },
+      applications: {
+        where: { userId: user.id },
+        select: { id: true, status: true },
+        take: 1,
+      },
     },
   })) as JobWithMatches[]
 
   // Add best match to each job and normalize JSON-string columns
-  const jobsWithMatch = jobs.map(job => {
+  let jobsWithMatch = jobs.map(job => {
     const userMatches = job.matches.filter(m => m.resume.userId === user.id)
     const bestMatch = userMatches.reduce<{
       score: number
@@ -102,11 +124,11 @@ async function getJobs(filters: JobListFilters) {
   if (filters.score) {
     const min = parseInt(filters.score)
     if (!isNaN(min) && min > 0) {
-      return jobsWithMatch.filter(job => job.match && job.match.score >= min)
+      jobsWithMatch = jobsWithMatch.filter(job => job.match && job.match.score >= min)
     }
   }
 
-  return jobsWithMatch
+  return { jobs: jobsWithMatch, resumeId: resume?.id }
 }
 
 export async function JobList({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
@@ -118,9 +140,10 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
     remote: typeof searchParams?.remote === 'string' ? searchParams.remote : undefined,
     posted: typeof searchParams?.posted === 'string' ? searchParams.posted : undefined,
     score: typeof searchParams?.score === 'string' ? searchParams.score : undefined,
+    status: typeof searchParams?.status === 'string' ? searchParams.status : undefined,
   }
 
-  const jobs = await getJobs(filters)
+  const { jobs, resumeId } = await getJobs(filters)
 
   if (jobs.length === 0) {
     return (
@@ -142,7 +165,11 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {jobs.map((job) => (
         <Suspense key={job.id} fallback={<JobSkeleton />}>
-          <JobCard job={job} />
+          <JobCard
+            job={job}
+            defaultResumeId={resumeId}
+            savedStatus={job.applications?.[0]?.status ?? null}
+          />
         </Suspense>
       ))}
     </div>
