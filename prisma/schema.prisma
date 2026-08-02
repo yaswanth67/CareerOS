@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resumes       Resume[]
+  preferences   Preference?
+  applications  Application[]
+}
+
+model Resume {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  roleType      String
+  fileName      String
+  filePath      String
+  parsedText    String
+  skills        String    // JSON array
+  experience    String    // JSON array
+  education     String    // JSON array
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  matches       Match[]
+  applications  Application[]
+}
+
+model Preference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetRoles      String   // JSON array
+  locations        String   // JSON array
+  remoteOnly       Boolean  @default(false)
+  visaRequired     Boolean  @default(false)
+  minSalary        Int?
+  excludedKeywords String   // JSON array
+  updatedAt        DateTime @updatedAt
+}
+
+model Job {
+  id              String   @id @default(cuid())
+  externalId      String
+  provider        String
+  title           String
+  company         String
+  location        String
+  isRemote        Boolean  @default(false)
+  description     String
+  requirements    String   // JSON array
+  skills          String   // JSON array
+  experienceLevel String
+  roleType        String
+  salaryMin       Int?
+  salaryMax       Int?
+  currency        String   @default("USD")
+  applyUrl        String
+  postedAt        DateTime
+  fetchedAt       DateTime @default(now())
+  expiresAt       DateTime?
+  isActive        Boolean  @default(true)
+  matches         Match[]
+  applications    Application[]
+
+  @@unique([externalId, provider])
+  @@index([provider, isActive])
+  @@index([roleType, isActive])
+  @@index([location, isActive])
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeId      String
+  resume        Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  score         Float
+  reasoning     String
+  matchedSkills String   // JSON array
+  missingSkills String   // JSON array
+  createdAt     DateTime @default(now())
+
+  @@unique([jobId, resumeId])
+  @@index([score])
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeId  String
+  resume    Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  status    String   @default("SAVED")
+  appliedAt DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, jobId])
+  @@index([status])
+}
+
