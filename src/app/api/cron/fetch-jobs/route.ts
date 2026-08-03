@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchAllJobs, deactivateExpiredJobs, getJobStats } from '@/lib/job-fetcher'
 import { checkJobLinks } from '@/lib/job-fetcher/link-checker'
+import { autoScoreAllUsers } from '@/lib/job-fetcher/auto-score'
 
 // This endpoint should be called by a cron service (e.g., Vercel Cron, GitHub Actions, etc.)
 // It fetches jobs from all providers, deactivates expired ones, and runs the
@@ -27,6 +28,10 @@ export async function GET(request: NextRequest) {
     // Guard-rail: deactivate jobs whose apply links are broken/fabricated
     const linkCheck = await checkJobLinks({ deactivate: true })
 
+    // Auto-score jobs for every user with a resume so scores stay fresh
+    const scoredByUser = await autoScoreAllUsers()
+    const totalScored = scoredByUser.reduce((sum, u) => sum + u.scored, 0)
+
     // Get updated stats
     const stats = await getJobStats()
 
@@ -34,6 +39,7 @@ export async function GET(request: NextRequest) {
       results: results.map(r => ({ provider: r.provider, jobsFetched: r.jobsFetched, jobsNew: r.jobsNew, jobsUpdated: r.jobsUpdated, jobsSkipped: r.jobsSkipped })),
       deactivatedCount,
       linkCheck: { checked: linkCheck.checked, broken: linkCheck.broken, deactivated: linkCheck.deactivated },
+      jobsScored: totalScored,
       stats,
     })
 
@@ -42,6 +48,7 @@ export async function GET(request: NextRequest) {
       results,
       deactivatedCount,
       linkCheck: { checked: linkCheck.checked, broken: linkCheck.broken, deactivated: linkCheck.deactivated },
+      jobsScored: totalScored,
       stats,
       timestamp: new Date().toISOString(),
     })

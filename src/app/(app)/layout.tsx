@@ -2,27 +2,18 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, FileText, Settings, ClipboardList, LogOut, User, Menu, X, ChevronDown, BarChart2 } from 'lucide-react'
+import { LogOut, User, Menu, X, ChevronDown, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/ui/Logo'
 import { GlobalHeader } from '@/components/layout/GlobalHeader'
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Analytics', href: '/analytics', icon: BarChart2 },
-  { name: 'Resumes', href: '/resumes', icon: FileText },
-  { name: 'Applications', href: '/applications', icon: ClipboardList },
-  { name: 'Preferences', href: '/preferences', icon: Settings },
-]
+import { NavLinks } from '@/components/layout/NavLinks'
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const pathname = usePathname()
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -61,27 +52,7 @@ export default function AppLayout({
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1" aria-label="Main navigation">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                )}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
-                {item.name}
-              </Link>
-            )
-          })}
-        </nav>
+        <NavLinks onNavigate={() => setSidebarOpen(false)} />
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3 px-3 py-2">

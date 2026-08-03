@@ -55,7 +55,12 @@ export function DashboardHeader() {
         return
       }
       const total = (data?.stats?.activeJobs ?? 0) as number
-      toast.success(`Fetched jobs — ${total.toLocaleString()} active now`)
+      const scored = (data?.scored ?? 0) as number
+      toast.success(
+        scored > 0
+          ? `Fetched jobs — ${total.toLocaleString()} active, scored ${scored.toLocaleString()}`
+          : `Fetched jobs — ${total.toLocaleString()} active now`
+      )
       router.replace('/dashboard')
     } catch {
       toast.error('Failed to refresh jobs')
@@ -91,19 +96,10 @@ export function DashboardHeader() {
   const handleScoreMatches = async () => {
     setScoring(true)
     try {
-      const resumesRes = await fetch('/api/resumes')
-      const resumesData = await resumesRes.json().catch(() => ({}))
-      const resumes = resumesData?.resumes || []
-      if (!resumesRes.ok || resumes.length === 0) {
-        toast.error('Upload a resume first — then you can score jobs')
-        return
-      }
-
-      const resume = resumes[0]
-      const res = await fetch('/api/matches', {
+      const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeId: resume.id }),
+        body: JSON.stringify({ action: 'score' }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -111,7 +107,12 @@ export function DashboardHeader() {
         return
       }
 
-      toast.success(`Scored ${data.matches?.length ?? 0} jobs against "${resume.title}"`)
+      const scored = (data?.scored ?? 0) as number
+      toast.success(
+        scored > 0
+          ? `Scored ${scored.toLocaleString()} jobs`
+          : 'All jobs are already scored'
+      )
       router.refresh()
     } catch {
       toast.error('Failed to score jobs')
