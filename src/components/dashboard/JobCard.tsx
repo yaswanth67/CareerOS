@@ -89,10 +89,15 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                {job.title}
-              </h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+              {job.title}
+            </h3>
+            {/* Role + score row — role always fully visible */}
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant="gray" className="flex-shrink-0">
+                <Building2 className="w-3 h-3 mr-1" />
+                {getRoleLabel(job.roleType)}
+              </Badge>
               {hasMatch ? (
                 <Badge className={getScoreColor(score)} title={getScoreLabel(score)}>
                   <Target className="w-3 h-3 mr-1" />
@@ -125,10 +130,6 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
           <span className="flex items-center gap-1.5">
             <Star className="w-3.5 h-3.5" />
             {getExperienceLabel(job.experienceLevel)}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5" />
-            {getRoleLabel(job.roleType)}
           </span>
           {job.salaryMin || job.salaryMax ? (
             <span className="flex items-center gap-1.5">
