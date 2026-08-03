@@ -80,6 +80,10 @@ async function getJobs(filters: JobListFilters) {
   // "Tracked" quick filter: only jobs the user has saved / applied to
   if (filters.status) {
     where.applications = { some: { userId: user.id, status: filters.status } }
+  } else {
+    // "All Jobs" — hide jobs the user has already applied to, so applied jobs
+    // don't reappear in the feed. They stay visible under the "Applied" filter.
+    where.applications = { none: { userId: user.id, status: 'APPLIED' } }
   }
 
   const orConditions: Prisma.JobWhereInput[] = []

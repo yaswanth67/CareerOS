@@ -60,6 +60,7 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [applying, setApplying] = useState(false)
+  const [reverting, setReverting] = useState(false)
   const [showAppliedPrompt, setShowAppliedPrompt] = useState(false)
   const score = job.match?.score || 0
   const hasMatch = !!job.match
@@ -170,6 +171,27 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
       toast.error('Failed to mark as applied')
     } finally {
       setApplying(false)
+    }
+  }
+
+  // Undo an "Applied" — deletes the application so the job shows in the feed again.
+  const handleRevertApplied = async () => {
+    const appId = job.applications?.[0]?.id
+    if (!appId) return
+    setReverting(true)
+    try {
+      const res = await fetch(`/api/applications/${appId}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success('Marked as not applied')
+        router.refresh()
+      } else {
+        toast.error(data?.error || 'Failed to mark as not applied')
+      }
+    } catch {
+      toast.error('Failed to mark as not applied')
+    } finally {
+      setReverting(false)
     }
   }
 
@@ -321,6 +343,23 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
                   {saving ? 'Saving...' : 'Save'}
                 </Button>
               )}
+            {savedStatus === 'APPLIED' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRevertApplied}
+                disabled={reverting}
+                className="flex-1 sm:flex-none"
+                title="Mark this job as not applied so it shows in the feed again"
+              >
+                {reverting ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <X className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                {reverting ? 'Removing...' : 'Not applied'}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
