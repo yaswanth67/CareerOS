@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target } from 'lucide-react'
+import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target, X } from 'lucide-react'
 import { formatRelativeTime, getScoreColor, getScoreLabel, getRoleLabel, getExperienceLabel } from '@/lib/utils'
 import { RoleType, ExperienceLevel } from '@/types'
 import toast from 'react-hot-toast'
@@ -18,6 +18,10 @@ const STATUS_META: Record<string, { label: string; variant: 'default' | 'success
   REJECTED: { label: 'Rejected', variant: 'danger' },
   WITHDRAWN: { label: 'Withdrawn', variant: 'gray' },
 }
+
+// Session-storage key used to remember the job the user opened an apply link for,
+// so we can ask "Have you applied?" when they come back to the dashboard tab.
+const PENDING_APPLY_KEY = 'pendingApplyCheck'
 
 export interface Job {
   id: string
@@ -54,8 +58,61 @@ interface JobCardProps {
 export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [showAppliedPrompt, setShowAppliedPrompt] = useState(false)
   const score = job.match?.score || 0
   const hasMatch = !!job.match
+
+  // Remember the job the user is applying to, then ask "Have you applied?" when
+  // they come back to this tab.
+  const rememberPendingApply = () => {
+    try {
+      sessionStorage.setItem(
+        PENDING_APPLY_KEY,
+        JSON.stringify({ jobId: job.id, title: job.title, company: job.company })
+      )
+    } catch {
+      // sessionStorage unavailable — the prompt just won't fire on return
+    }
+  }
+
+  const clearPendingApply = () => {
+    try {
+      sessionStorage.removeItem(PENDING_APPLY_KEY)
+    } catch {
+      // ignore
+    }
+    setShowAppliedPrompt(false)
+  }
+
+  // Check for a pending apply for THIS job on mount and whenever the tab regains
+  // focus (i.e. the user comes back from the external application page).
+  useEffect(() => {
+    const checkPendingApply = () => {
+      if (savedStatus === 'APPLIED') return
+      try {
+        const raw = sessionStorage.getItem(PENDING_APPLY_KEY)
+        if (!raw) return
+        const pending = JSON.parse(raw)
+        if (pending && pending.jobId === job.id) {
+          setShowAppliedPrompt(true)
+        }
+      } catch {
+        // ignore malformed/blocked storage
+      }
+    }
+
+    checkPendingApply()
+    window.addEventListener('focus', checkPendingApply)
+    return () => window.removeEventListener('focus', checkPendingApply)
+  }, [job.id, savedStatus])
+
+  const handleApplyClick = () => {
+    if (job.applyUrl) {
+      window.open(job.applyUrl, '_blank', 'noopener,noreferrer')
+    }
+    rememberPendingApply()
+  }
 
   const handleSave = async () => {
     if (!defaultResumeId) {
@@ -83,153 +140,247 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
     }
   }
 
+  // Mark the job as applied so it's tracked under Applications with an appliedAt date.
+  const handleMarkApplied = async () => {
+    if (!defaultResumeId) {
+      toast.error('Upload a resume first to track applications')
+      return
+    }
+    setApplying(true)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, resumeId: defaultResumeId, status: 'APPLIED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success('Marked as applied — tracking under Applications')
+        clearPendingApply()
+        router.refresh()
+      } else {
+        toast.error(data?.error || 'Failed to mark as applied')
+      }
+    } catch {
+      toast.error('Failed to mark as applied')
+    } finally {
+      setApplying(false)
+    }
+  }
+
   return (
-    <Card className="card-hover overflow-hidden">
-      <CardContent className="p-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-              {job.title}
-            </h3>
-            {/* Role + score row — role always fully visible */}
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <Badge variant="gray" className="flex-shrink-0">
-                <Building2 className="w-3 h-3 mr-1" />
-                {getRoleLabel(job.roleType)}
-              </Badge>
-              {hasMatch ? (
-                <Badge className={getScoreColor(score)} title={getScoreLabel(score)}>
-                  <Target className="w-3 h-3 mr-1" />
-                  {score}%
-                </Badge>
-              ) : (
-                <Badge variant="gray" className="flex-shrink-0">
-                  <Target className="w-3 h-3 mr-1" />
-                  No match
-                </Badge>
-              )}
-            </div>
-            <p className="text-primary-600 dark:text-primary-400 font-medium truncate">
-              {job.company}
-            </p>
-          </div>
-          {job.provider && (
-            <Badge variant="gray" className="flex-shrink-0">
-              {job.provider}
-            </Badge>
-          )}
-        </div>
-
-        {/* Meta info */}
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
-          <span className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" />
-            {job.isRemote ? 'Remote' : job.location}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5" />
-            {getExperienceLabel(job.experienceLevel)}
-          </span>
-          {job.salaryMin || job.salaryMax ? (
-            <span className="flex items-center gap-1.5">
-              <DollarSign className="w-3.5 h-3.5" />
-              ${job.salaryMin ? `${(job.salaryMin / 1000).toFixed(0)}k` : '?'} - ${job.salaryMax ? `${(job.salaryMax / 1000).toFixed(0)}k` : '?'}
-            </span>
-          ) : null}
-          <span className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            {formatRelativeTime(job.postedAt)}
-          </span>
-        </div>
-
-        {/* Match Details */}
-        {hasMatch && (
-          <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              {job.match?.reasoning}
-            </p>
-            {job.match?.matchedSkills.length && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {job.match.matchedSkills.slice(0, 6).map((skill) => (
-                  <Badge key={skill} variant="success" className="text-xs">
-                    <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
-                    {skill}
-                  </Badge>
-                ))}
-                {job.match.matchedSkills.length > 6 && (
-                  <Badge variant="gray" className="text-xs">
-                    +{job.match.matchedSkills.length - 6} more
-                  </Badge>
-                )}
-              </div>
-            )}
-            {job.match?.missingSkills.length && (
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Missing: {job.match.missingSkills.slice(0, 4).join(', ')}
-                {job.match.missingSkills.length > 4 && '...'}
+    <>
+      <Card className="card-hover overflow-hidden">
+        <CardContent className="p-5">
+          {/* Header — title first so the role is always visible */}
+          <div className="flex items-start justify-between gap-4 mb-1">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-white truncate">
+                {job.title}
+              </h3>
+              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium truncate mt-0.5">
+                {job.company}
               </p>
-            )}
-          </div>
-        )}
-
-        {/* Skills */}
-        {job.skills.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-1.5">
-            {job.skills.slice(0, 8).map((skill) => (
-              <Badge key={skill} variant="gray" className="text-xs">
-                {skill}
-              </Badge>
-            ))}
-            {job.skills.length > 8 && (
-              <Badge variant="gray" className="text-xs">
-                +{job.skills.length - 8} more
+            </div>
+            {job.provider && (
+              <Badge variant="gray" className="flex-shrink-0">
+                {job.provider}
               </Badge>
             )}
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(job.applyUrl, '_blank', 'noopener,noreferrer')}
-            className="flex-1 sm:flex-none"
-            disabled={!job.applyUrl}
-            title={job.applyUrl ? 'Open application page' : 'No application link available'}
-          >
-            <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-            Apply
-          </Button>
-          {defaultResumeId &&
-            (savedStatus ? (
+          {/* Tags below the title — role, match score, application status */}
+          <div className="flex flex-wrap items-center gap-2 mt-2 mb-3">
+            <Badge variant="gray" className="flex-shrink-0">
+              <Building2 className="w-3 h-3 mr-1" />
+              {getRoleLabel(job.roleType)}
+            </Badge>
+            {hasMatch ? (
+              <Badge className={getScoreColor(score)} title={getScoreLabel(score)}>
+                <Target className="w-3 h-3 mr-1" />
+                {score}% match
+              </Badge>
+            ) : (
+              <Badge variant="gray" className="flex-shrink-0">
+                <Target className="w-3 h-3 mr-1" />
+                No match
+              </Badge>
+            )}
+            {savedStatus && (
               <Badge
                 variant={STATUS_META[savedStatus]?.variant ?? 'gray'}
-                className="flex-shrink-0 py-1.5 px-2.5"
+                className="flex-shrink-0"
                 title={`This job is ${(STATUS_META[savedStatus]?.label ?? savedStatus).toLowerCase()} — manage it under Applications`}
               >
                 <CheckCircle2 className="w-3 h-3 mr-1" />
                 {STATUS_META[savedStatus]?.label ?? savedStatus.toLowerCase()}
               </Badge>
-            ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 sm:flex-none"
-              >
-                {saving ? (
+            )}
+          </div>
+
+          {/* Meta info */}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              {job.isRemote ? 'Remote' : job.location}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5" />
+              {getExperienceLabel(job.experienceLevel)}
+            </span>
+            {job.salaryMin || job.salaryMax ? (
+              <span className="flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5" />
+                ${job.salaryMin ? `${(job.salaryMin / 1000).toFixed(0)}k` : '?'} - ${job.salaryMax ? `${(job.salaryMax / 1000).toFixed(0)}k` : '?'}
+              </span>
+            ) : null}
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              {formatRelativeTime(job.postedAt)}
+            </span>
+          </div>
+
+          {/* Match Details */}
+          {hasMatch && (
+            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {job.match?.reasoning}
+              </p>
+              {job.match?.matchedSkills.length && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {job.match.matchedSkills.slice(0, 6).map((skill) => (
+                    <Badge key={skill} variant="success" className="text-xs">
+                      <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                      {skill}
+                    </Badge>
+                  ))}
+                  {job.match.matchedSkills.length > 6 && (
+                    <Badge variant="gray" className="text-xs">
+                      +{job.match.matchedSkills.length - 6} more
+                    </Badge>
+                  )}
+                </div>
+              )}
+              {job.match?.missingSkills.length && (
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Missing: {job.match.missingSkills.slice(0, 4).join(', ')}
+                  {job.match.missingSkills.length > 4 && '...'}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Skills */}
+          {job.skills.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {job.skills.slice(0, 8).map((skill) => (
+                <Badge key={skill} variant="gray" className="text-xs">
+                  {skill}
+                </Badge>
+              ))}
+              {job.skills.length > 8 && (
+                <Badge variant="gray" className="text-xs">
+                  +{job.skills.length - 8} more
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleApplyClick}
+              className="flex-1 sm:flex-none"
+              disabled={!job.applyUrl}
+              title={job.applyUrl ? 'Open application page' : 'No application link available'}
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+              Apply
+            </Button>
+            {defaultResumeId &&
+              savedStatus !== 'APPLIED' && (
+                <>
+                  {!savedStatus && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {saving ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      {saving ? 'Saving...' : 'Save'}
+                    </Button>
+                  )}
+                  {(!savedStatus || savedStatus === 'SAVED') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleMarkApplied}
+                      disabled={applying}
+                      className="flex-1 sm:flex-none"
+                      title="Mark this job as applied so it's tracked under Applications"
+                    >
+                      {applying ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      {applying ? 'Adding...' : 'Applied'}
+                    </Button>
+                  )}
+                </>
+              )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* "Have you applied?" popup — shown when the user returns from the apply link */}
+      {showAppliedPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={clearPendingApply}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-sm bg-white dark:bg-gray-800 rounded-xl p-6 shadow-xl">
+            <button
+              onClick={clearPendingApply}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Have you applied?
+            </h4>
+            <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
+              Did you submit an application for{' '}
+              <span className="font-medium text-gray-900 dark:text-white">{job.title}</span>{' '}
+              at <span className="font-medium text-gray-900 dark:text-white">{job.company}</span>?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={clearPendingApply}>
+                Not yet
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleMarkApplied} disabled={applying}>
+                {applying ? (
                   <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 ) : (
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                 )}
-                {saving ? 'Saving...' : 'Save'}
+                {applying ? 'Adding...' : 'Yes, I applied'}
               </Button>
-            ))}
+            </div>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </>
   )
 }
