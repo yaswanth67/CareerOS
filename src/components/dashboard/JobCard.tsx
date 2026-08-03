@@ -300,42 +300,21 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
               Apply
             </Button>
             {defaultResumeId &&
-              savedStatus !== 'APPLIED' && (
-                <>
-                  {!savedStatus && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="flex-1 sm:flex-none"
-                    >
-                      {saving ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                      )}
-                      {saving ? 'Saving...' : 'Save'}
-                    </Button>
+              !savedStatus && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 sm:flex-none"
+                >
+                  {saving ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                   )}
-                  {(!savedStatus || savedStatus === 'SAVED') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleMarkApplied}
-                      disabled={applying}
-                      className="flex-1 sm:flex-none"
-                      title="Mark this job as applied so it's tracked under Applications"
-                    >
-                      {applying ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                      )}
-                      {applying ? 'Adding...' : 'Applied'}
-                    </Button>
-                  )}
-                </>
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
               )}
           </div>
         </CardContent>
