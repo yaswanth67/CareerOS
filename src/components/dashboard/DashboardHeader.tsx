@@ -1,21 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Plus, RefreshCw, Loader2, Sparkles } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Plus, RefreshCw, Loader2, Sparkles, ShieldCheck, Bookmark, Send } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { cn } from '@/lib/utils'
+import { AppStatus } from '@/types'
+import { FilterTrigger, FilterPanel } from './FilterPanel'
 
 export function DashboardHeader() {
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [refreshing, setRefreshing] = useState(false)
   const [scoring, setScoring] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [roleName, setRoleName] = useState<string>('')
+
+  const currentStatus = (searchParams.get('status') || '') as AppStatus | ''
+
+  // Load the user's most recent resume title to greet them by their target role
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/resumes')
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        const resumes = data?.resumes ?? []
+        if (resumes.length > 0) {
+          setRoleName(resumes[0].title)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
+      // Clear all filters on refresh - show all jobs
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28,7 +56,7 @@ export function DashboardHeader() {
       }
       const total = (data?.stats?.activeJobs ?? 0) as number
       toast.success(`Fetched jobs — ${total.toLocaleString()} active now`)
-      router.refresh()
+      router.replace('/dashboard')
     } catch {
       toast.error('Failed to refresh jobs')
     } finally {
@@ -36,10 +64,33 @@ export function DashboardHeader() {
     }
   }
 
+  const handleCheckLinks = async () => {
+    setChecking(true)
+    try {
+      const res = await fetch('/api/jobs/check-links', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data?.error || 'Failed to check links')
+        return
+      }
+      if (data.deactivated > 0) {
+        toast.success(`Removed ${data.deactivated} job${data.deactivated === 1 ? '' : 's'} with broken apply links`)
+      } else if (data.broken === 0) {
+        toast.success(`Checked ${data.checked} links — all good`)
+      } else {
+        toast.success(`Checked ${data.checked} links — ${data.broken} broken (some unreachable, left in place)`)
+      }
+      router.refresh()
+    } catch {
+      toast.error('Failed to check links')
+    } finally {
+      setChecking(false)
+    }
+  }
+
   const handleScoreMatches = async () => {
     setScoring(true)
     try {
-      // Use the user's most recent resume to score the latest jobs.
       const resumesRes = await fetch('/api/resumes')
       const resumesData = await resumesRes.json().catch(() => ({}))
       const resumes = resumesData?.resumes || []
@@ -69,46 +120,116 @@ export function DashboardHeader() {
     }
   }
 
+  const statusOptions: { value: AppStatus | ''; label: string; icon?: React.ElementType }[] = [
+    { value: '', label: 'All Jobs' },
+    { value: 'SAVED', label: 'Saved', icon: Bookmark },
+    { value: 'APPLIED', label: 'Applied', icon: Send },
+  ]
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}!
+          Welcome back, {roleName || session?.user?.name?.split(' ')[0] || 'there'}!
         </h1>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
           Here are your latest job matches
         </p>
       </div>
-      <div className="flex items-center gap-3">
-        <Link href="/resumes/new" className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Upload Resume
-        </Link>
-        <button
-          className="btn-secondary"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          {refreshing ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4" />
-          )}
-          {refreshing ? 'Fetching...' : 'Refresh Jobs'}
-        </button>
-        <button
-          className="btn-outline"
-          onClick={handleScoreMatches}
-          disabled={scoring}
-          title="Score the latest jobs against your most recent resume"
-        >
-          {scoring ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Sparkles className="w-4 h-4" />
-          )}
-          {scoring ? 'Scoring...' : 'Score Matches'}
-        </button>
+      <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+        {/* Filters Bar - Status, Advanced Filters all aligned */}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Status Filter Buttons */}
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide hidden sm:inline-flex self-center">
+              Status:
+            </span>
+            {statusOptions.map((opt) => {
+              const Icon = opt.icon
+              const isActive = currentStatus === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString())
+                    if (opt.value) {
+                      params.set('status', opt.value)
+                    } else {
+                      params.delete('status')
+                    }
+                    router.replace(`/dashboard?${params.toString()}`)
+                  }}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+                    isActive
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  )}
+                >
+                  {Icon && <Icon className="w-3.5 h-3.5" />}
+                  {opt.label}
+                </button>
+              )
+            })}
+
+            {/* Advanced Filters Trigger */}
+            <FilterTrigger
+              isOpen={showAdvancedFilters}
+              onClick={() => setShowAdvancedFilters(true)}
+            />
+          </div>
+
+          {/* Advanced Filters Panel */}
+          <FilterPanel
+            isOpen={showAdvancedFilters}
+            onClose={() => setShowAdvancedFilters(false)}
+          />
+
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <Link href="/resumes/new" className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Upload Resume
+            </Link>
+            <button
+              className="btn-secondary"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              {refreshing ? 'Fetching...' : 'Refresh Jobs'}
+            </button>
+            <button
+              className="btn-outline"
+              onClick={handleCheckLinks}
+              disabled={checking}
+              title="Check every job's apply link and remove broken ones"
+            >
+              {checking ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              {checking ? 'Checking...' : 'Check Links'}
+            </button>
+            <button
+              className="btn-outline"
+              onClick={handleScoreMatches}
+              disabled={scoring}
+              title="Score the latest jobs against your most recent resume"
+            >
+              {scoring ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {scoring ? 'Scoring...' : 'Score Matches'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

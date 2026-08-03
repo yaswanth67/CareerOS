@@ -20,7 +20,7 @@ export type RoleType =
   | 'PM'
   | 'OTHER'
 
-export type JobProvider = 'GREENHOUSE' | 'LEVER' | 'COMPANY_DIRECT' | 'WELLFOUND' | 'OTHER'
+export type JobProvider = 'GREENHOUSE' | 'ASHBY' | 'LEVER' | 'COMPANY_DIRECT' | 'WELLFOUND' | 'OTHER'
 
 export type ExperienceLevel = 'ENTRY' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'
 

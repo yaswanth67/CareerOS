@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { StatsCards } from '@/components/dashboard/StatsCards'
-import { JobFilters } from '@/components/dashboard/JobFilters'
 import { JobList } from '@/components/dashboard/JobList'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { getJobStats } from '@/lib/job-fetcher'
@@ -18,8 +17,10 @@ export default async function DashboardPage({
   const user = await getCurrentUser()
   if (!user) redirect('/auth/signin')
 
+  const selectedCountry = params.country as string | undefined
+
   const [jobStats, matchesCount, strongMatches, applicationsCount] = await Promise.all([
-    getJobStats(),
+    getJobStats(selectedCountry),
     prisma.match.count({ where: { resume: { userId: user.id } } }),
     prisma.match.count({ where: { resume: { userId: user.id }, score: { gte: 80 } } }),
     prisma.application.count({ where: { userId: user.id } }),
@@ -37,7 +38,6 @@ export default async function DashboardPage({
           applications: applicationsCount,
         }}
       />
-      <JobFilters />
       <Suspense fallback={<DashboardSkeleton />}>
         <JobList searchParams={params} />
       </Suspense>

@@ -19,27 +19,29 @@ interface GreenhouseJob {
 export class GreenhouseProvider extends BaseJobProvider {
   name: JobProvider = 'GREENHOUSE'
 
+  // Each board is verified live against boards-api.greenhouse.io before being
+  // kept here. Boards whose companies moved to another ATS (e.g. Notion,
+  // Linear, Snowflake → Ashby) are removed so we never fetch stale/dead URLs.
   private boards = [
     'airbnb',
     'stripe',
     'coinbase',
     'databricks',
-    'snowflake',
     'reddit',
     'discord',
-    'notion',
     'figma',
-    'linear',
     'vercel',
-    'supabase',
     'planetscale',
-    'railway',
-    'render',
-    'fly.io',
-    'temporal',
-    'cockroachdb',
-    'materialize',
-    'timescale',
+    'spacex',
+    'robinhood',
+    'anthropic',
+    'twitch',
+    'dropbox',
+    'mongodb',
+    'twilio',
+    'okta',
+    'cloudflare',
+    'airtable',
   ]
 
   async fetchJobs(filters: JobFetchFilters): Promise<RawJob[]> {
