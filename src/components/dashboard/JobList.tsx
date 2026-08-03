@@ -193,7 +193,7 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
   }
 
   return (
-    <div className="flex flex-col gap-5 w-full max-w-4xl mx-auto">
+    <div className="flex flex-col gap-5 w-full">
       {jobs.map((job) => (
         <Suspense key={job.id} fallback={<JobSkeleton />}>
           <JobCard
