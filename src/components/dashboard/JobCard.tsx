@@ -112,6 +112,10 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
       window.open(job.applyUrl, '_blank', 'noopener,noreferrer')
     }
     rememberPendingApply()
+    // Show the "Have you applied?" prompt right away so it's waiting for them
+    // when they come back from the application page. The new tab opens on top,
+    // so the user only sees this popup once they return to the dashboard.
+    setShowAppliedPrompt(true)
   }
 
   const handleSave = async () => {
