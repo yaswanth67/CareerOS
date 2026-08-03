@@ -41,6 +41,10 @@ interface RawCompanyJob {
   url?: string
   applicationUrl?: string
   careerSiteUrl?: string
+  // Amazon's job search.json returns a relative detail path and a direct apply
+  // URL on separate fields.
+  job_path?: string
+  url_next_step?: string
   postedAt?: Date | string
   createdAt?: Date | string
   datePosted?: Date | string
@@ -51,28 +55,12 @@ interface RawCompanyJob {
 export class CompanyDirectProvider extends BaseJobProvider {
   name: JobProvider = 'COMPANY_DIRECT'
 
-  // Top tech companies with known career page APIs or JSON endpoints
+  // Company career pages with public JSON endpoints that are actually live.
+  // The other companies previously listed here returned 404/403/400 — those
+  // fabricated apply links were exactly the broken ones users saw. Companies
+  // are fetched through the ATS they actually use instead (Greenhouse/Ashby).
   private companies = [
-    { name: 'Google', url: 'https://careers.google.com/api/v3/search/?q=&location=&category=&page=1&page_size=100' },
-    { name: 'Microsoft', url: 'https://careers.microsoft.com/api/jobs?page=1&pageSize=100' },
     { name: 'Amazon', url: 'https://www.amazon.jobs/en/search.json?category=software-development&result_limit=100' },
-    { name: 'Meta', url: 'https://www.metacareers.com/api/v2/jobs?limit=100' },
-    { name: 'Apple', url: 'https://jobs-api.apple.com/api/v1/search?limit=100' },
-    { name: 'Netflix', url: 'https://explore.jobs.netflix.net/api/jobs?limit=100' },
-    { name: 'Uber', url: 'https://www.uber.com/api/jobs/v1/list?limit=100' },
-    { name: 'Airbnb', url: 'https://careers.airbnb.com/api/v1/jobs?limit=100' },
-    { name: 'Stripe', url: 'https://stripe.com/jobs/api/v1/search?limit=100' },
-    { name: 'Shopify', url: 'https://jobs.shopify.com/api/v1/jobs?limit=100' },
-    { name: 'Square', url: 'https://squareup.com/api/v1/jobs?limit=100' },
-    { name: 'Robinhood', url: 'https://robinhood.com/api/v1/jobs?limit=100' },
-    { name: 'Coinbase', url: 'https://coinbase.com/api/v1/jobs?limit=100' },
-    { name: 'Databricks', url: 'https://databricks.com/api/v1/jobs?limit=100' },
-    { name: 'Snowflake', url: 'https://snowflake.com/api/v1/jobs?limit=100' },
-    { name: 'OpenAI', url: 'https://openai.com/api/v1/jobs?limit=100' },
-    { name: 'Anthropic', url: 'https://anthropic.com/api/v1/jobs?limit=100' },
-    { name: 'NVIDIA', url: 'https://nvidia.com/api/v1/jobs?limit=100' },
-    { name: 'Tesla', url: 'https://tesla.com/api/v1/jobs?limit=100' },
-    { name: 'SpaceX', url: 'https://spacex.com/api/v1/jobs?limit=100' },
   ]
 
   async fetchJobs(filters: JobFetchFilters): Promise<RawJob[]> {
@@ -158,7 +146,17 @@ export class CompanyDirectProvider extends BaseJobProvider {
         salaryMin: job.salaryMin || job.minSalary || job.compensationMin,
         salaryMax: job.salaryMax || job.maxSalary || job.compensationMax,
         currency: job.currency || 'USD',
-        applyUrl: job.applyUrl || job.url || job.applicationUrl || job.careerSiteUrl || `https://careers.${companyName.toLowerCase().replace(/\s+/g, '')}.com`,
+        // Build the apply URL from real fields only — never synthesize a
+        // careers-homepage fallback. Amazon returns a relative job_path that
+        // points at the public detail page (the safe, non-login Apply target).
+        applyUrl:
+          job.url_next_step ||
+          (job.job_path ? `https://www.amazon.jobs${job.job_path}` : '') ||
+          job.applyUrl ||
+          job.url ||
+          job.applicationUrl ||
+          job.careerSiteUrl ||
+          '',
         postedAt: job.postedAt || job.createdAt || job.datePosted || new Date(),
         expiresAt: job.expiresAt || job.expirationDate,
       })

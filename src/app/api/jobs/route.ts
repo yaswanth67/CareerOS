@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { fetchAllJobs, getJobStats } from '@/lib/job-fetcher'
-import { parseJsonArray } from '@/lib/utils'
+import { parseJsonArray, extractCountry } from '@/lib/utils'
 import { RoleType, ExperienceLevel, JobProvider } from '@/types'
 import { Prisma, type Job } from '@prisma/client'
 
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     const roleTypes = searchParams.get('roleTypes')?.split(',') as RoleType[] | undefined
     const experienceLevels = searchParams.get('experienceLevels')?.split(',') as ExperienceLevel[] | undefined
     const locations = searchParams.get('locations')?.split(',').filter(Boolean)
+    const countries = searchParams.get('countries')?.split(',').filter(Boolean)
     const remoteOnly = searchParams.get('remoteOnly') === 'true'
     const minScore = parseInt(searchParams.get('minScore') || '0')
     const search = searchParams.get('search')
@@ -76,6 +77,21 @@ export async function GET(request: NextRequest) {
 
     if (remoteOnly) where.isRemote = true
     if (provider) where.provider = provider
+
+    // Countries filter - extract country from location field
+    if (countries?.length) {
+      const countryConditions: Prisma.JobWhereInput[] = []
+      for (const country of countries) {
+        if (country === 'Global/Remote') {
+          countryConditions.push({ isRemote: true })
+        } else {
+          countryConditions.push({ location: { contains: country } })
+        }
+      }
+      if (countryConditions.length) {
+        where.OR = where.OR ? [...where.OR, ...countryConditions] : countryConditions
+      }
+    }
 
     // "Posted within" filter (hours) — e.g. ?postedWithin=24 for last day, 48 for 2 days
     if (postedWithin) {
@@ -156,11 +172,31 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / pageSize),
       },
+      // Include available countries for filter dropdown
+      countries: await getAvailableCountries(),
     })
   } catch (error) {
     console.error('Get jobs error:', error)
     return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 })
   }
+}
+
+// Helper to get all available countries from active jobs
+async function getAvailableCountries(): Promise<string[]> {
+  const jobs = await prisma.job.findMany({
+    where: { isActive: true },
+    select: { location: true, isRemote: true },
+  })
+  const countries = new Set<string>()
+  for (const job of jobs) {
+    const country = extractCountry(job.location)
+    if (country) {
+      countries.add(country)
+    } else if (job.isRemote) {
+      countries.add('Global/Remote')
+    }
+  }
+  return Array.from(countries).sort()
 }
 
 export async function POST(request: NextRequest) {

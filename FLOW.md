@@ -7,8 +7,9 @@ importantly — **where your resume is used** at every step.
 
 MatchIQ is a personal job-search assistant. It:
 
-1. **Fetches live job listings** from public job APIs (Greenhouse, Lever, and direct
-   company career APIs like Amazon/Google/Microsoft).
+1. **Fetches live job listings** from public job APIs (Greenhouse, Ashby, Lever, and
+   direct company career APIs like Amazon). Every apply link is validated so broken
+   links never reach the feed.
 2. **Parses the resumes you upload** (PDF, DOCX, or text) into structured data.
 3. **Scores every job against your resume** — using AI when an API key is configured,
    otherwise a built-in offline heuristic — so you can see how well each role fits.
@@ -69,9 +70,20 @@ resume text leaves your computer except when AI scoring is enabled (see Privacy 
 | `/preferences` | Target roles, locations, remote/visa, salary, exclusions |
 | `/applications` | Your saved & applied jobs — update status, add notes, remove |
 | `/api/jobs` `POST {action:"fetch"}` | Fetch fresh jobs from all providers |
+| `/api/jobs/check-links` `POST` | Guard-rail: check every apply link, deactivate broken ones |
 | `/api/matches` `POST` | Score jobs against a resume |
 | `/api/applications` `POST` | Save / mark an application |
-| `/api/cron/fetch-jobs` | Scheduled (Vercel Cron) job refresh |
+| `/api/cron/fetch-jobs` | Scheduled (Vercel Cron) job refresh **+ link check** |
+
+### Guard-rail: broken apply links
+
+Every apply URL must pass `validateApplyUrl()` (`src/lib/job-providers/base.ts`)
+before it is saved — fabricated homepage links, placeholder ids (`/jobs/123`), and
+malformed URLs are rejected at fetch time. A separate link-checker
+(`scripts/check-job-links.ts`, or the dashboard **Check Links** button → `POST
+/api/jobs/check-links`) then HTTP-checks every active job and **deactivates** the
+ones that 404. The scheduled cron runs the same check every 6h. Bot-blocked
+(403/429) and server-error (5xx) links are reported but left in place.
 
 ---
 
@@ -145,8 +157,10 @@ the entry. The **Apply** button on a job card opens the employer's own site.
 ### 4.2 Dashboard
 - **Active Jobs** — live count of active jobs in the DB. *Not hardcoded*: it is
   `prisma.job.count({ where: { isActive: true } })` on every load. Grows when you
-  click **Refresh Jobs** (fetches real listings from Greenhouse, Lever, and company
-  career APIs), shrinks when the scheduled cron deactivates expired postings.
+  click **Refresh Jobs** (fetches real listings from Greenhouse, Ashby, Lever, and
+  Amazon), shrinks when the scheduled cron deactivates expired postings.
+- **Check Links button** — runs the apply-link guard-rail over every active job
+  and deactivates the ones with broken/fabricated links.
 - **Strong Matches** — jobs scored ≥80% against any of your resumes.
 - **Applications** — count of saved/applied jobs.
 - **Score Matches button** — runs your most recent resume against the newest jobs.
@@ -169,9 +183,11 @@ the entry. The **Apply** button on a job card opens the employer's own site.
   priority, minimum salary, and excluded keywords. These shape filtering and
   matching for new jobs.
 
-### 4.6 Applications *(coming — see section 3.4)*
-- Save a job to apply later; mark it `SAVED → APPLIED → INTERVIEWING → OFFER` and
-  attach notes; view everything on one page.
+### 4.6 Applications
+- Save a job to apply later; mark it `SAVED → APPLIED → INTERVIEWING → OFFER →
+  REJECTED → WITHDRAWN` and attach notes; view everything on one page.
+- **Filters (all optional):** status chips, a **position/company** search box, and
+  a **location** box — combine freely to narrow your list.
 
 ---
 
@@ -181,8 +197,14 @@ the entry. The **Apply** button on a job card opens the employer's own site.
   `parseJsonArray` / `stringifyJsonArray` in `src/lib/utils.ts`.
 - **AI is optional:** with no API key, matching and resume parsing fall back to
   offline heuristics so the app works end-to-end.
-- **Job providers:** `greenhouse` / `lever` hit real public APIs; `company-direct`
-  hits real career APIs (some companies require per-company parsers); `wellfound`
-  has no public API and returns nothing.
+- **Job providers:** `greenhouse` / `ashby` / `lever` hit real public APIs;
+  `company-direct` is Amazon only (its `search.json` returns `job_path` +
+  `url_next_step`, which are turned into real apply URLs); `wellfound` has no
+  public API and returns nothing. Provider board/company lists are pruned to
+  slugs **verified live** — dead boards (e.g. Notion/Linear/Snowflake moved to
+  Ashby) are removed so stale links are never refetched.
+- **Guard-rail:** `npm run check-links` (report) / `npm run check-links:fix`
+  (report + deactivate). `validateApplyUrl()` shape-checks at save time;
+  `src/lib/job-fetcher/link-checker.ts` HTTP-checks on demand.
 - **Cron:** `vercel.json` schedules `GET /api/cron/fetch-jobs` every 6h; requires
-  `CRON_SECRET` if set.
+  `CRON_SECRET` if set. It also runs the link check and deactivates broken links.

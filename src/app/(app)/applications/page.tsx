@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
-  Briefcase, MapPin, ExternalLink, Trash2, Loader2, CheckCircle2, Clock, Inbox,
+  Briefcase, MapPin, ExternalLink, Trash2, Loader2, CheckCircle2, Clock, Inbox, Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -49,6 +49,8 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<AppStatus | 'ALL'>('ALL')
+  const [position, setPosition] = useState('')
+  const [location, setLocation] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -111,7 +113,16 @@ export default function ApplicationsPage() {
     }
   }
 
-  const visible = filter === 'ALL' ? applications : applications.filter(a => a.status === filter)
+  const q = position.trim().toLowerCase()
+  const loc = location.trim().toLowerCase()
+
+  // Optional, combined filters: status + job position/company + location.
+  const visible = applications.filter(a => {
+    if (filter !== 'ALL' && a.status !== filter) return false
+    if (q && !`${a.job.title} ${a.job.company}`.toLowerCase().includes(q)) return false
+    if (loc && !a.job.location.toLowerCase().includes(loc)) return false
+    return true
+  })
 
   if (isLoading) {
     return (
@@ -128,6 +139,32 @@ export default function ApplicationsPage() {
         <p className="mt-1 text-gray-600 dark:text-gray-400">
           Track every job you&apos;ve saved or applied to — from initial save to offer
         </p>
+      </div>
+
+      {/* Position + location filters (both optional) */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={position}
+            onChange={e => setPosition(e.target.value)}
+            placeholder="Filter by job position or company…"
+            className="input pl-9"
+            aria-label="Filter by position or company"
+          />
+        </div>
+        <div className="relative">
+          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            placeholder="Filter by location (e.g. Remote, SF)…"
+            className="input pl-9"
+            aria-label="Filter by location"
+          />
+        </div>
       </div>
 
       {/* Status filter */}
@@ -166,12 +203,18 @@ export default function ApplicationsPage() {
         <Card className="text-center py-12">
           <Inbox className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            {applications.length === 0 ? 'No applications yet' : 'Nothing in this status'}
+            {applications.length === 0
+              ? 'No applications yet'
+              : q || loc
+                ? 'No applications match your filters'
+                : 'Nothing in this status'}
           </h3>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
             {applications.length === 0
               ? 'Click "Save" on any job card in the dashboard to start tracking it here'
-              : 'Try another status filter'}
+              : q || loc
+                ? 'Try different keywords, a location, or clear the filters'
+                : 'Try another status filter'}
           </p>
           {applications.length === 0 && (
             <Link href="/dashboard" className="mt-4 inline-block">

@@ -18,28 +18,10 @@ interface LeverJob {
 export class LeverProvider extends BaseJobProvider {
   name: JobProvider = 'LEVER'
 
-  private companies = [
-    'netflix',
-    'airbnb',
-    'quora',
-    'pinterest',
-    'dropbox',
-    'lyft',
-    'doordash',
-    'instacart',
-    'robinhood',
-    'coinbase',
-    'plaid',
-    'stripe',
-    'brex',
-    'ramp',
-    'mercury',
-    'wise',
-    'revolut',
-    'n26',
-    'monzo',
-    'chime',
-  ]
+  // Most companies moved off Lever — only slugs that still respond to
+  // api.lever.co/v0/postings/<company>?mode=json are kept. The rest returned
+  // 404 during verification and produced stale/fabricated links.
+  private companies = ['plaid']
 
   async fetchJobs(filters: JobFetchFilters): Promise<RawJob[]> {
     const results = await Promise.all(

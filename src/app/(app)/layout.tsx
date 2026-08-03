@@ -4,12 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { LayoutDashboard, FileText, Settings, ClipboardList, LogOut, User, Menu, X, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, FileText, Settings, ClipboardList, LogOut, User, Menu, X, ChevronDown, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/ui/Logo'
+import { GlobalHeader } from '@/components/layout/GlobalHeader'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Analytics', href: '/analytics', icon: BarChart2 },
   { name: 'Resumes', href: '/resumes', icon: FileText },
   { name: 'Applications', href: '/applications', icon: ClipboardList },
   { name: 'Preferences', href: '/preferences', icon: Settings },
@@ -149,11 +151,7 @@ export default function AppLayout({
 
           <div className="flex-1 lg:flex-none" />
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:block text-sm text-gray-500 dark:text-gray-400">
-              {session?.user?.name}
-            </div>
-          </div>
+          <GlobalHeader />
         </header>
 
         {/* Page content */}

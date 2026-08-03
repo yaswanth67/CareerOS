@@ -16,6 +16,8 @@ interface JobListFilters {
   posted?: string
   score?: string
   status?: string
+  countries?: string
+  country?: string
 }
 
 type MatchWithResume = Prisma.MatchGetPayload<{
@@ -42,10 +44,38 @@ async function getJobs(filters: JobListFilters) {
 
   const roles = filters.roles?.split(',').filter(Boolean) as RoleType[] | undefined
   const exp = filters.exp?.split(',').filter(Boolean) as ExperienceLevel[] | undefined
+  const countries = filters.countries?.split(',').filter(Boolean)
+
+  // Also support single country from dropdown
+  const singleCountry = filters.country
 
   if (roles?.length) where.roleType = { in: roles }
   if (exp?.length) where.experienceLevel = { in: exp }
   if (filters.remote === '1') where.isRemote = true
+
+  // Countries filter (multi-select from advanced filters)
+  if (countries?.length) {
+    const countryConditions: Prisma.JobWhereInput[] = []
+    for (const country of countries) {
+      if (country === 'Global/Remote') {
+        countryConditions.push({ isRemote: true })
+      } else {
+        countryConditions.push({ location: { contains: country } })
+      }
+    }
+    if (countryConditions.length) {
+      where.OR = where.OR ? [...where.OR, ...countryConditions] : countryConditions
+    }
+  }
+
+  // Single country filter (from top dropdown)
+  if (singleCountry) {
+    if (singleCountry === 'Global/Remote') {
+      where.isRemote = true
+    } else {
+      where.location = { contains: singleCountry }
+    }
+  }
 
   // "Tracked" quick filter: only jobs the user has saved / applied to
   if (filters.status) {
@@ -76,8 +106,7 @@ async function getJobs(filters: JobListFilters) {
   const jobs = (await prisma.job.findMany({
     where,
     orderBy: { postedAt: 'desc' },
-    // When filtering by a tracked status, show every matching job
-    take: filters.status ? undefined : 24,
+    // Show every matching job - no artificial limit
     include: {
       matches: {
         where: { resume: { userId: user.id } },
@@ -141,6 +170,8 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
     posted: typeof searchParams?.posted === 'string' ? searchParams.posted : undefined,
     score: typeof searchParams?.score === 'string' ? searchParams.score : undefined,
     status: typeof searchParams?.status === 'string' ? searchParams.status : undefined,
+    countries: typeof searchParams?.countries === 'string' ? searchParams.countries : undefined,
+    country: typeof searchParams?.country === 'string' ? searchParams.country : undefined,
   }
 
   const { jobs, resumeId } = await getJobs(filters)

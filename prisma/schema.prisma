@@ -8,71 +8,71 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String    @unique
-  email         String?   @unique
-  passwordHash  String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  resumes       Resume[]
-  preferences   Preference?
-  applications  Application[]
+  id           String        @id @default(cuid())
+  name         String        @unique
+  email        String?       @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  applications Application[]
+  preferences  Preference?
+  resumes      Resume[]
 }
 
 model Resume {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title         String
-  roleType      String
-  fileName      String
-  filePath      String
-  parsedText    String
-  skills        String    // JSON array
-  experience    String    // JSON array
-  education     String    // JSON array
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  matches       Match[]
-  applications  Application[]
+  id           String        @id @default(cuid())
+  userId       String
+  title        String
+  roleType     String
+  fileName     String
+  filePath     String
+  parsedText   String
+  skills       String
+  experience   String
+  education    String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  applications Application[]
+  matches      Match[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Preference {
   id               String   @id @default(cuid())
   userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targetRoles      String   // JSON array
-  locations        String   // JSON array
+  targetRoles      String
+  locations        String
   remoteOnly       Boolean  @default(false)
   visaRequired     Boolean  @default(false)
   minSalary        Int?
-  excludedKeywords String   // JSON array
+  excludedKeywords String
   updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Job {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   externalId      String
   provider        String
   title           String
   company         String
   location        String
-  isRemote        Boolean  @default(false)
+  isRemote        Boolean       @default(false)
   description     String
-  requirements    String   // JSON array
-  skills          String   // JSON array
+  requirements    String
+  skills          String
   experienceLevel String
   roleType        String
   salaryMin       Int?
   salaryMax       Int?
-  currency        String   @default("USD")
+  currency        String        @default("USD")
   applyUrl        String
   postedAt        DateTime
-  fetchedAt       DateTime @default(now())
+  fetchedAt       DateTime      @default(now())
   expiresAt       DateTime?
-  isActive        Boolean  @default(true)
-  matches         Match[]
+  isActive        Boolean       @default(true)
   applications    Application[]
+  matches         Match[]
 
   @@unique([externalId, provider])
   @@index([provider, isActive])
@@ -83,34 +83,52 @@ model Job {
 model Match {
   id            String   @id @default(cuid())
   jobId         String
-  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   resumeId      String
-  resume        Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   score         Float
   reasoning     String
-  matchedSkills String   // JSON array
-  missingSkills String   // JSON array
+  matchedSkills String
+  missingSkills String
   createdAt     DateTime @default(now())
+  resume        Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@unique([jobId, resumeId])
   @@index([score])
 }
 
 model Application {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobId     String
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   resumeId  String
-  resume    Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-  status    String   @default("SAVED")
+  status    String    @default("SAVED")
   appliedAt DateTime?
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  resume    Resume    @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, jobId])
   @@index([status])
+  @@index([userId, createdAt])
+  @@index([userId, appliedAt])
 }
 
+model DailyGoal {
+  id                      String   @id @default(cuid())
+  userId                  String
+  date                    DateTime @default(now())
+  applicationsTarget      Int      @default(3)
+  applicationsCompleted   Int      @default(0)
+  networkingTarget        Int      @default(1)
+  networkingCompleted     Int      @default(0)
+  skillLearningTarget     Int      @default(1)
+  skillLearningCompleted  Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}

@@ -62,3 +62,5 @@ public/uploads/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+# session cookies (sensitive)
+cookies.txt
