@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { fetchAllJobs, getJobStats } from '@/lib/job-fetcher'
+import { autoScoreUserJobs } from '@/lib/job-fetcher/auto-score'
 import { parseJsonArray, extractCountry } from '@/lib/utils'
 import { RoleType, ExperienceLevel, JobProvider } from '@/types'
 import { Prisma, type Job } from '@prisma/client'
@@ -211,8 +212,20 @@ export async function POST(request: NextRequest) {
 
     if (action === 'fetch') {
       const results = await fetchAllJobs()
+
+      // Automatically score the newly available jobs against the user's most
+      // recent resume so every card shows a match score without a manual click.
+      const scored = await autoScoreUserJobs(user.id)
+
       const stats = await getJobStats()
-      return NextResponse.json({ results, stats })
+      return NextResponse.json({ results, stats, scored })
+    }
+
+    if (action === 'score') {
+      // Score every active job the user hasn't been matched against yet, using
+      // the fast heuristic scorer. Covers all cards instantly.
+      const scored = await autoScoreUserJobs(user.id)
+      return NextResponse.json({ scored })
     }
 
     if (action === 'stats') {

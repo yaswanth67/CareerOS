@@ -281,3 +281,28 @@ export async function batchScoreJobs(
 
   return results
 }
+
+/**
+ * Bulk heuristic scoring — fast and free (no API calls). Used for automatic
+ * scoring when jobs are fetched, so every active job gets a match score without
+ * hitting the LLM for thousands of jobs.
+ */
+export async function batchScoreJobsHeuristic(
+  resumeText: string,
+  resumeSkills: string[],
+  jobs: Array<{
+    id: string
+    title: string
+    company: string
+    description: string
+    skills: string[]
+    experienceLevel: string
+    roleType: string
+  }>
+): Promise<Map<string, MatchResult>> {
+  const results = new Map<string, MatchResult>()
+  for (const job of jobs) {
+    results.set(job.id, heuristicScore(resumeText, resumeSkills, job))
+  }
+  return results
+}
