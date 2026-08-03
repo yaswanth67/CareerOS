@@ -179,10 +179,10 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
           {/* Header — title first so the role is always visible */}
           <div className="flex items-start justify-between gap-4 mb-1">
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-white truncate">
+              <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-white">
                 {job.title}
               </h3>
-              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium truncate mt-0.5">
+              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium mt-0.5">
                 {job.company}
               </p>
             </div>
