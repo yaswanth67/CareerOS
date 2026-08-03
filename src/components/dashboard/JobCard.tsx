@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target } from 'lucide-react'
-import { formatRelativeTime, getScoreColor, getScoreLabel } from '@/lib/utils'
+import { formatRelativeTime, getScoreColor, getScoreLabel, getRoleLabel, getExperienceLabel } from '@/lib/utils'
 import { RoleType, ExperienceLevel } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -124,11 +124,11 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
           </span>
           <span className="flex items-center gap-1.5">
             <Star className="w-3.5 h-3.5" />
-            {job.experienceLevel}
+            {getExperienceLabel(job.experienceLevel)}
           </span>
           <span className="flex items-center gap-1.5">
             <Building2 className="w-3.5 h-3.5" />
-            {job.roleType}
+            {getRoleLabel(job.roleType)}
           </span>
           {job.salaryMin || job.salaryMax ? (
             <span className="flex items-center gap-1.5">

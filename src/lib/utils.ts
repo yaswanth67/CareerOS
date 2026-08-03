@@ -42,6 +42,41 @@ export function getScoreLabel(score: number): string {
   return 'Poor Match'
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  SDE: 'Software Engineer',
+  AI_ENGINEER: 'AI Engineer',
+  ML_ENGINEER: 'ML Engineer',
+  DATA_SCIENTIST: 'Data Scientist',
+  DATA_ENGINEER: 'Data Engineer',
+  DEVOPS: 'DevOps Engineer',
+  SRE: 'SRE Engineer',
+  FULLSTACK: 'Full Stack Developer',
+  FRONTEND: 'Frontend Developer',
+  BACKEND: 'Backend Developer',
+  MOBILE: 'Mobile Developer',
+  EMBEDDED: 'Embedded Engineer',
+  SECURITY: 'Security Engineer',
+  QA: 'QA Engineer',
+  PM: 'Product Manager',
+  OTHER: 'Other',
+}
+
+export function getRoleLabel(roleType: string): string {
+  return ROLE_LABELS[roleType] ?? roleType
+}
+
+const EXPERIENCE_LABELS: Record<string, string> = {
+  ENTRY: 'Entry Level',
+  MID: 'Mid Level',
+  SENIOR: 'Senior',
+  STAFF: 'Staff',
+  PRINCIPAL: 'Principal',
+}
+
+export function getExperienceLabel(level: string): string {
+  return EXPERIENCE_LABELS[level] ?? level
+}
+
 export function truncate(text: string, length: number): string {
   if (text.length <= length) return text
   return text.slice(0, length).trim() + '...'
