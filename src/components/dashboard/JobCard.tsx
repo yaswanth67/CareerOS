@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -324,9 +325,13 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
         </CardContent>
       </Card>
 
-      {/* "Have you applied?" popup — shown when the user returns from the apply link */}
-      {showAppliedPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      {/* "Have you applied?" popup — shown when the user returns from the apply link.
+          Rendered through a portal to <body> so no parent card/layout CSS can ever
+          clip or hide it. */}
+      {showAppliedPrompt &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={clearPendingApply}
@@ -361,9 +366,10 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
                 {applying ? 'Adding...' : 'Yes, I applied'}
               </Button>
             </div>
-          </div>
-        </div>
-      )}
+            </div>
+            </div>,
+            document.body
+          )}
     </>
   )
 }
