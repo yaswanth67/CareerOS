@@ -13,6 +13,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "check-links": "tsx scripts/check-job-links.ts",
     "check-links:fix": "tsx scripts/check-job-links.ts --deactivate",
+    "backfill:sponsorship": "tsx scripts/backfill-sponsorship.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

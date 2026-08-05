@@ -38,6 +38,9 @@ export class AshbyProvider extends BaseJobProvider {
     'verkada',
     'sierra',
     'plaid',
+    'elevenlabs',
+    'loom',
+    'mystenlabs',
   ]
 
   async fetchJobs(filters: JobFetchFilters): Promise<RawJob[]> {
@@ -90,14 +93,6 @@ export class AshbyProvider extends BaseJobProvider {
       console.error(`Error fetching Ashby jobs for ${board}:`, error)
     }
     return jobs
-  }
-
-  private stripHtml(html: string): string {
-    return html
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
   }
 }
 
