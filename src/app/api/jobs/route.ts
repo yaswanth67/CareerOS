@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { fetchAllJobs, getJobStats } from '@/lib/job-fetcher'
 import { autoScoreUserJobs } from '@/lib/job-fetcher/auto-score'
+import { classifySponsorshipForJobs } from '@/lib/job-fetcher/sponsorship'
+import { checkJobLinks } from '@/lib/job-fetcher/link-checker'
 import { parseJsonArray, extractCountry } from '@/lib/utils'
 import { RoleType, ExperienceLevel, JobProvider } from '@/types'
 import { Prisma, type Job } from '@prisma/client'
@@ -49,6 +51,8 @@ export async function GET(request: NextRequest) {
     const provider = searchParams.get('provider') as JobProvider | undefined
     const includeMatches = searchParams.get('includeMatches') === 'true'
     const postedWithin = searchParams.get('postedWithin') // hours, e.g. 24, 48, 168
+    const company = searchParams.get('company')
+    const sponsorship = searchParams.get('sponsorship') === 'true'
 
     // Build where clause
     const where: Prisma.JobWhereInput = { isActive: true }
@@ -78,6 +82,8 @@ export async function GET(request: NextRequest) {
 
     if (remoteOnly) where.isRemote = true
     if (provider) where.provider = provider
+    if (company) where.company = { contains: company }
+    if (sponsorship) where.visaSponsored = true
 
     // Countries filter - extract country from location field
     if (countries?.length) {
@@ -217,8 +223,17 @@ export async function POST(request: NextRequest) {
       // recent resume so every card shows a match score without a manual click.
       const scored = await autoScoreUserJobs(user.id)
 
+      // Classify a batch of the newest unclassified jobs for visa sponsorship
+      // (keyword pre-screen + AI). Covers new jobs and slowly eats the backlog.
+      const sponsorshipClassified = await classifySponsorshipForJobs({ limit: 50 })
+
+      // Apply-link guard-rail runs automatically with every refresh — no need
+      // for a separate "Check Links" step. Capped so the refresh stays fast; the
+      // 6-hourly cron sweeps the full database.
+      const linkCheck = await checkJobLinks({ deactivate: true, limit: 500 })
+
       const stats = await getJobStats()
-      return NextResponse.json({ results, stats, scored })
+      return NextResponse.json({ results, stats, scored, sponsorshipClassified, linkCheck })
     }
 
     if (action === 'score') {
@@ -226,6 +241,14 @@ export async function POST(request: NextRequest) {
       // the fast heuristic scorer. Covers all cards instantly.
       const scored = await autoScoreUserJobs(user.id)
       return NextResponse.json({ scored })
+    }
+
+    if (action === 'sponsorship') {
+      // Classify the next batch of jobs whose sponsorship status is still
+      // unknown. Run repeatedly (or use the backfill script) to cover the whole
+      // database. Pairs with the "Sponsorship" dashboard filter.
+      const sponsorshipClassified = await classifySponsorshipForJobs({ limit: 100 })
+      return NextResponse.json({ sponsorshipClassified })
     }
 
     if (action === 'stats') {

@@ -42,6 +42,15 @@ export class GreenhouseProvider extends BaseJobProvider {
     'okta',
     'cloudflare',
     'airtable',
+    'instacart',
+    'lyft',
+    'pinterest',
+    'chime',
+    'fivetran',
+    'squarespace',
+    'cockroachlabs',
+    'datadog',
+    'netskope',
   ]
 
   async fetchJobs(filters: JobFetchFilters): Promise<RawJob[]> {
@@ -106,14 +115,6 @@ export class GreenhouseProvider extends BaseJobProvider {
 
     parsed.roleType = this.parseRoleType(job.title)
     return parsed
-  }
-
-  private stripHtml(html: string): string {
-    return html
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
   }
 }
 
