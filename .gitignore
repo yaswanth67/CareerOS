@@ -49,6 +49,9 @@ prisma/dev.db-journal
 # stray tarballs
 *.tgz
 
+# career-ops workspace (cloned tool + its own deps/config)
+career-ops/
+
 # uploads
 public/uploads/
 

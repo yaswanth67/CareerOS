@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { getRoleLabel, getExperienceLabel, formatRelativeTime, downloadFile, cn, htmlToText } from '@/lib/utils'
 import type { InterviewQuestionSet } from '@/types'
+import { CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
 import toast from 'react-hot-toast'
 
 // PENDING_APPLY_KEY must match JobCard so its "Have you applied?" portal fires
@@ -133,6 +134,8 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
   const [questionsLoading, setQuestionsLoading] = useState(false)
   const [similar, setSimilar] = useState<SimilarJob[]>([])
   const [similarLoading, setSimilarLoading] = useState(false)
+  const [evaluation, setEvaluation] = useState<CareerOpsReportData | null>(null)
+  const [evaluationLoading, setEvaluationLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const score = currentJob.match?.score || 0
@@ -252,6 +255,24 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
     }
   }
 
+  const handleRunCareerOps = async () => {
+    setEvaluationLoading(true)
+    setEvaluation(null)
+    try {
+      const res = await fetch(`/api/jobs/${currentJob.id}/career-ops`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.report) {
+        setEvaluation(data.report)
+      } else {
+        toast.error(data?.error || 'Failed to run career-ops evaluation')
+      }
+    } catch {
+      toast.error('Failed to run career-ops evaluation')
+    } finally {
+      setEvaluationLoading(false)
+    }
+  }
+
   const copyText = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -275,6 +296,7 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
         setLetter('')
         setEmail('')
         setQuestions(null)
+        setEvaluation(null)
         scrollRef.current?.scrollTo({ top: 0 })
         loadSimilar(id)
       } else {
@@ -432,6 +454,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
                 <MessagesSquare className="w-3.5 h-3.5 mr-1.5" />
                 {questionsLoading ? 'Preparing...' : 'Prep for interview'}
               </Button>
+              <Button variant="outline" size="sm" onClick={handleRunCareerOps} isLoading={evaluationLoading}>
+                <Target className="w-3.5 h-3.5 mr-1.5" />
+                {evaluationLoading ? 'Scoring...' : 'Career Ops score'}
+              </Button>
             </div>
 
             {letter && (
@@ -514,6 +540,8 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
                 </div>
               </div>
             )}
+
+            {evaluation && <CareerOpsReport report={evaluation} />}
           </div>
 
           {/* Full description */}
