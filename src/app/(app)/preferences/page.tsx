@@ -243,7 +243,11 @@ export default function PreferencesPage() {
       const res = await fetch('/api/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          // SQLite stores NULL for "no minimum" — clear it when the field is emptied
+          minSalary: data.minSalary ?? null,
+        }),
       })
       if (res.ok) {
         toast.success('Preferences saved!')
@@ -305,6 +309,23 @@ export default function PreferencesPage() {
                 Tune how MatchIQ finds, filters, and scores jobs for you
               </p>
             </div>
+            <Button
+              type="submit"
+              disabled={saving}
+              className="shrink-0 bg-white text-primary-600 hover:bg-primary-50 focus:ring-white/60"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Save Preferences
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
@@ -392,7 +413,12 @@ export default function PreferencesPage() {
                   <Input
                     id="minSalary"
                     type="number"
-                    {...register('minSalary', { valueAsNumber: true })}
+                    {...register('minSalary', {
+                      // Empty input → undefined (not NaN), so clearing the field
+                      // passes validation instead of silently blocking the save.
+                      setValueAs: (v) =>
+                        v === '' || v === undefined || v === null ? undefined : Number(v),
+                    })}
                     placeholder="e.g., 120000"
                     className="mt-1.5"
                   />
@@ -448,30 +474,6 @@ export default function PreferencesPage() {
                 />
               </div>
             </Card>
-          </div>
-        </div>
-
-        {/* Fixed save bar at bottom - fixed indentation */}
-        <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 border-t border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between gap-3 max-w-4xl mx-auto">
-            <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
-              Preferences affect new matches and job filtering
-            </p>
-            <div className="flex items-center gap-2 ml-auto">
-              <Button type="submit" disabled={saving} className="w-auto sm:w-[160px]">
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="hidden sm:inline">Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span className="hidden sm:inline">Save Preferences</span>
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
         </div>
       </div>
