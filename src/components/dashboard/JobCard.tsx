@@ -6,10 +6,11 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target, X, ShieldCheck, Eye } from 'lucide-react'
+import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target, X, ShieldCheck, Eye, FileText } from 'lucide-react'
 import { formatRelativeTime, getScoreColor, getScoreLabel, getRoleLabel, getExperienceLabel } from '@/lib/utils'
 import { RoleType, ExperienceLevel } from '@/types'
 import { JobDetailDrawer } from './JobDetailDrawer'
+import { TailorResumeDrawer } from './TailorResumeDrawer'
 import toast from 'react-hot-toast'
 
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
@@ -66,6 +67,7 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
   const [reverting, setReverting] = useState(false)
   const [showAppliedPrompt, setShowAppliedPrompt] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [tailorOpen, setTailorOpen] = useState(false)
   const score = job.match?.score || 0
   const hasMatch = !!job.match
 
@@ -351,6 +353,16 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
               <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
               Apply
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTailorOpen(true)}
+              className="flex-1 sm:flex-none"
+              title="Tailor your resume to this job"
+            >
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              Tailor CV
+            </Button>
             {defaultResumeId &&
               !savedStatus && (
                 <Button
@@ -442,6 +454,15 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
           defaultResumeId={defaultResumeId}
           savedStatus={savedStatus}
           onClose={() => setDetailsOpen(false)}
+        />
+      )}
+
+      {/* Tailor CV drawer — rewrites the user's resume against this job */}
+      {tailorOpen && (
+        <TailorResumeDrawer
+          job={job}
+          defaultResumeId={defaultResumeId}
+          onClose={() => setTailorOpen(false)}
         />
       )}
     </>
