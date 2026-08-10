@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw, Loader2, Sparkles, Bookmark, Send } from 'lucide-react'
@@ -9,7 +9,6 @@ import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import { AppStatus } from '@/types'
 import { FilterTrigger, FilterPanel } from './FilterPanel'
-import { CompanyDropdown, CompanyOption } from './CompanyDropdown'
 
 export function DashboardHeader() {
   const { data: session } = useSession()
@@ -18,43 +17,8 @@ export function DashboardHeader() {
   const [refreshing, setRefreshing] = useState(false)
   const [scoring, setScoring] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const [roleName, setRoleName] = useState<string>('')
-  const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([])
 
   const currentStatus = (searchParams.get('status') || '') as AppStatus | ''
-
-  // Load every company that has active jobs (with counts) for the Company
-  // dropdown; names also feed the Advanced Filters field's autocomplete.
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/jobs/companies')
-      .then(res => res.json())
-      .then(data => {
-        if (!cancelled) setCompanyOptions(data?.companies ?? [])
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Load the user's most recent resume title to greet them by their target role
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/resumes')
-      .then(res => res.json())
-      .then(data => {
-        if (cancelled) return
-        const resumes = data?.resumes ?? []
-        if (resumes.length > 0) {
-          setRoleName(resumes[0].title)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -128,7 +92,7 @@ export function DashboardHeader() {
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Welcome back, {roleName || session?.user?.name?.split(' ')[0] || 'there'}!
+          Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}!
         </h1>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
           Here are your latest job matches
@@ -170,44 +134,6 @@ export function DashboardHeader() {
               )
             })}
 
-            {/* Experience Level Quick Filters */}
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide hidden sm:inline-flex self-center">
-              Level:
-            </span>
-            {[
-              { value: 'ENTRY', label: 'New Grad' },
-              { value: 'SENIOR', label: 'Senior' },
-            ].map((opt) => {
-              const currentExp = (searchParams.get('exp') || '').split(',').filter(Boolean)
-              const isActive = currentExp.includes(opt.value)
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => {
-                    const params = new URLSearchParams(searchParams.toString())
-                    const current = (params.get('exp') || '').split(',').filter(Boolean)
-                    const next = current.includes(opt.value)
-                      ? current.filter(v => v !== opt.value)
-                      : [...current, opt.value]
-                    if (next.length) params.set('exp', next.join(','))
-                    else params.delete('exp')
-                    router.replace(`/dashboard?${params.toString()}`)
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
-                    isActive
-                      ? 'bg-primary-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                  )}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-
-            {/* Company picker — browse every company with active jobs */}
-            <CompanyDropdown companies={companyOptions} />
-
             {/* Advanced Filters Trigger */}
             <FilterTrigger
               isOpen={showAdvancedFilters}
@@ -219,7 +145,6 @@ export function DashboardHeader() {
           <FilterPanel
             isOpen={showAdvancedFilters}
             onClose={() => setShowAdvancedFilters(false)}
-            availableCompanies={companyOptions.map(c => c.name)}
           />
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">

@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Filter, MapPin, Briefcase, Star, Globe, Clock, Target, Bookmark, Send, Loader2, Building2, ShieldCheck } from 'lucide-react'
+import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { RoleType, ExperienceLevel, AppStatus } from '@/types'
+import { RoleType, AppStatus } from '@/types'
 import toast from 'react-hot-toast'
 
 export const roleOptions: { value: RoleType; label: string }[] = [
@@ -24,14 +24,6 @@ export const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'QA', label: 'QA' },
   { value: 'PM', label: 'Product Manager' },
   { value: 'OTHER', label: 'Other' },
-]
-
-export const experienceOptions: { value: ExperienceLevel; label: string }[] = [
-  { value: 'ENTRY', label: 'New Grad' },
-  { value: 'MID', label: 'Mid Level' },
-  { value: 'SENIOR', label: 'Senior' },
-  { value: 'STAFF', label: 'Staff' },
-  { value: 'PRINCIPAL', label: 'Principal' },
 ]
 
 export const scoreOptions = [
@@ -61,20 +53,17 @@ export const statusOptions: { value: AppStatus | ''; label: string; icon?: React
 interface Filters {
   q: string
   roles: RoleType[]
-  exp: ExperienceLevel[]
   loc: string
   remote: boolean
   score: string
   posted: string
   status: AppStatus | ''
-  company: string
   sponsorship: boolean
 }
 
 interface FilterPanelProps {
   isOpen: boolean
   onClose: () => void
-  availableCompanies?: string[]
 }
 
 function readParams(searchParams: URLSearchParams): Filters {
@@ -82,13 +71,11 @@ function readParams(searchParams: URLSearchParams): Filters {
   return {
     q: searchParams.get('q') || '',
     roles: (searchParams.get('roles')?.split(',').filter(Boolean) as RoleType[]) || [],
-    exp: (searchParams.get('exp')?.split(',').filter(Boolean) as ExperienceLevel[]) || [],
     loc: searchParams.get('loc') || '',
     remote: searchParams.get('remote') === '1',
     score: searchParams.get('score') || '0',
     posted: searchParams.get('posted') || '',
     status: (['SAVED', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'WITHDRAWN'].includes(status) ? status : '') as AppStatus | '',
-    company: searchParams.get('company') || '',
     sponsorship: searchParams.get('sponsorship') === '1',
   }
 }
@@ -97,44 +84,38 @@ function toQuery(f: Filters): string {
   const params = new URLSearchParams()
   if (f.q.trim()) params.set('q', f.q.trim())
   if (f.roles.length) params.set('roles', f.roles.join(','))
-  if (f.exp.length) params.set('exp', f.exp.join(','))
   if (f.loc.trim()) params.set('loc', f.loc.trim())
   if (f.remote) params.set('remote', '1')
   if (f.score && f.score !== '0') params.set('score', f.score)
   if (f.posted) params.set('posted', f.posted)
   if (f.status) params.set('status', f.status)
-  if (f.company.trim()) params.set('company', f.company.trim())
   if (f.sponsorship) params.set('sponsorship', '1')
   const s = params.toString()
   return s ? `?${s}` : ''
 }
 
-export function FilterPanel({ isOpen, onClose, availableCompanies = [] }: FilterPanelProps) {
+export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [filters, setFilters] = useState<Filters>(() => readParams(new URLSearchParams(searchParams.toString())))
   const [searchInput, setSearchInput] = useState(filters.q)
   const [locationInput, setLocationInput] = useState(filters.loc)
-  const [companyInput, setCompanyInput] = useState(filters.company)
   const [saving, setSaving] = useState(false)
 
   const activeFiltersCount =
     filters.roles.length +
-    filters.exp.length +
     (filters.loc ? 1 : 0) +
     (filters.remote ? 1 : 0) +
     (filters.score !== '0' ? 1 : 0) +
     (filters.posted ? 1 : 0) +
     (filters.status ? 1 : 0) +
     (filters.q ? 1 : 0) +
-    (filters.company ? 1 : 0) +
     (filters.sponsorship ? 1 : 0)
 
   const commit = (next: Filters) => {
     setFilters(next)
     setSearchInput(next.q)
     setLocationInput(next.loc)
-    setCompanyInput(next.company)
     router.replace(`/dashboard${toQuery(next)}`)
   }
 
@@ -145,21 +126,14 @@ export function FilterPanel({ isOpen, onClose, availableCompanies = [] }: Filter
     commit({ ...filters, roles })
   }
 
-  const toggleExperience = (exp: ExperienceLevel) => {
-    const next = filters.exp.includes(exp)
-      ? filters.exp.filter(e => e !== exp)
-      : [...filters.exp, exp]
-    commit({ ...filters, exp: next })
-  }
-
   const applyTextFilters = () => {
-    commit({ ...filters, q: searchInput, loc: locationInput, company: companyInput })
+    commit({ ...filters, q: searchInput, loc: locationInput })
   }
 
   const clearAllFilters = () => {
     const empty: Filters = {
-      q: '', roles: [], exp: [], loc: '', remote: false, score: '0', posted: '', status: '',
-      company: '', sponsorship: false,
+      q: '', roles: [], loc: '', remote: false, score: '0', posted: '', status: '',
+      sponsorship: false,
     }
     commit(empty)
   }
@@ -244,28 +218,6 @@ export function FilterPanel({ isOpen, onClose, availableCompanies = [] }: Filter
             </div>
           </div>
 
-          {/* Company Filter */}
-          <div>
-            <label className="label flex items-center gap-1.5">
-              <Building2 className="w-4 h-4" />
-              Company
-            </label>
-            <input
-              type="text"
-              list="company-suggestions"
-              value={companyInput}
-              onChange={(e) => setCompanyInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && applyTextFilters()}
-              placeholder="e.g., Stripe, Vercel, OpenAI"
-              className="input mt-1"
-            />
-            <datalist id="company-suggestions">
-              {availableCompanies.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </div>
-
           {/* Status Filter */}
           <div>
             <label className="label flex items-center gap-1.5">
@@ -314,30 +266,6 @@ export function FilterPanel({ isOpen, onClose, availableCompanies = [] }: Filter
                   )}
                 >
                   {role.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Experience Level */}
-          <div>
-            <label className="label flex items-center gap-1.5">
-              <Star className="w-4 h-4" />
-              Experience Level
-            </label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {experienceOptions.map((exp) => (
-                <button
-                  key={exp.value}
-                  onClick={() => toggleExperience(exp.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
-                    filters.exp.includes(exp.value)
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                  )}
-                >
-                  {exp.label}
                 </button>
               ))}
             </div>

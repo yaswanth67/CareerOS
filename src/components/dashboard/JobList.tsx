@@ -6,19 +6,17 @@ import { LoadMoreButton } from './LoadMoreButton'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import { parseJsonArray } from '@/lib/utils'
-import { RoleType, ExperienceLevel } from '@/types'
+import { RoleType } from '@/types'
 
 interface JobListFilters {
   q?: string
   roles?: string
-  exp?: string
   loc?: string
   remote?: string
   posted?: string
   score?: string
   status?: string
   country?: string
-  company?: string
   sponsorship?: string
   page?: number
 }
@@ -48,18 +46,12 @@ async function getJobs(filters: JobListFilters) {
   const where: Prisma.JobWhereInput = { isActive: true }
 
   const roles = filters.roles?.split(',').filter(Boolean) as RoleType[] | undefined
-  const exp = filters.exp?.split(',').filter(Boolean) as ExperienceLevel[] | undefined
 
   // Single country from the top-bar dropdown
   const singleCountry = filters.country
 
   if (roles?.length) where.roleType = { in: roles }
-  if (exp?.length) where.experienceLevel = { in: exp }
   if (filters.remote === '1') where.isRemote = true
-
-  // Dedicated company filter (AND with the free-text search, which also matches
-  // company names as part of its OR group)
-  if (filters.company) where.company = { contains: filters.company }
 
   // Only jobs confirmed to offer visa sponsorship (AI/keyword detected)
   if (filters.sponsorship === '1') where.visaSponsored = true
@@ -139,7 +131,7 @@ async function getJobs(filters: JobListFilters) {
   ])) as [JobWithMatches[], number]
 
   // Add best match to each job and normalize JSON-string columns
-  let jobsWithMatch = jobs.map(job => {
+  const jobsWithMatch = jobs.map(job => {
     const userMatches = job.matches.filter(m => m.resume.userId === user.id)
     const bestMatch = userMatches.reduce<{
       score: number
@@ -199,14 +191,12 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
   const filters: JobListFilters = {
     q: typeof searchParams?.q === 'string' ? searchParams.q : undefined,
     roles: typeof searchParams?.roles === 'string' ? searchParams.roles : undefined,
-    exp: typeof searchParams?.exp === 'string' ? searchParams.exp : undefined,
     loc: typeof searchParams?.loc === 'string' ? searchParams.loc : undefined,
     remote: typeof searchParams?.remote === 'string' ? searchParams.remote : undefined,
     posted: typeof searchParams?.posted === 'string' ? searchParams.posted : undefined,
     score: typeof searchParams?.score === 'string' ? searchParams.score : undefined,
     status: typeof searchParams?.status === 'string' ? searchParams.status : undefined,
     country: typeof searchParams?.country === 'string' ? searchParams.country : undefined,
-    company: typeof searchParams?.company === 'string' ? searchParams.company : undefined,
     sponsorship: typeof searchParams?.sponsorship === 'string' ? searchParams.sponsorship : undefined,
     page: typeof searchParams?.page === 'string' ? parseInt(searchParams.page) || 1 : 1,
   }

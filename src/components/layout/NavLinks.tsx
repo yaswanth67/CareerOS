@@ -3,11 +3,12 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Settings, ClipboardList, BarChart2, Search, ExternalLink } from 'lucide-react'
+import { LayoutDashboard, FileText, Settings, ClipboardList, BarChart2, Search, Star, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Best Matches', href: '/matches', icon: Star },
   { name: 'Analytics', href: '/analytics', icon: BarChart2 },
   { name: 'Resumes', href: '/resumes', icon: FileText },
   { name: 'Applications', href: '/applications', icon: ClipboardList },

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
-import { roleOptions, experienceOptions, scoreOptions, statusOptions } from './FilterPanel'
+import { roleOptions, scoreOptions, statusOptions } from './FilterPanel'
 
 // A visible bar of the filters currently applied to the job feed. Each chip can
 // be removed individually (or all cleared), so a narrowed list is never a
@@ -31,9 +31,6 @@ export function ActiveFilters() {
   for (const value of searchParams.get('roles')?.split(',').filter(Boolean) ?? []) {
     chips.push({ key: 'roles', value, label: roleOptions.find(o => o.value === value)?.label ?? value })
   }
-  for (const value of searchParams.get('exp')?.split(',').filter(Boolean) ?? []) {
-    chips.push({ key: 'exp', value, label: experienceOptions.find(o => o.value === value)?.label ?? value })
-  }
 
   const loc = searchParams.get('loc')
   if (loc) chips.push({ key: 'loc', value: loc, label: `Location: ${loc}` })
@@ -54,9 +51,6 @@ export function ActiveFilters() {
   const country = searchParams.get('country')
   if (country) chips.push({ key: 'country', value: country, label: country })
 
-  const company = searchParams.get('company')
-  if (company) chips.push({ key: 'company', value: company, label: `Company: ${company}` })
-
   if (searchParams.get('sponsorship') === '1') chips.push({ key: 'sponsorship', value: '1', label: 'Sponsorship available' })
 
   if (chips.length === 0) return null
@@ -66,7 +60,7 @@ export function ActiveFilters() {
   // pagination back to page 1.
   const removeFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (key === 'roles' || key === 'exp') {
+    if (key === 'roles') {
       const remaining = (params.get(key) || '').split(',').filter(Boolean).filter(v => v !== value)
       if (remaining.length) params.set(key, remaining.join(','))
       else params.delete(key)

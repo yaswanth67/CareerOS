@@ -155,7 +155,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
   }, [])
 
   useEffect(() => {
-    loadSimilar(currentJob.id)
+    const id = currentJob.id
+    // Defer so setState isn't called synchronously inside the effect.
+    const t = setTimeout(() => loadSimilar(id), 0)
+    return () => clearTimeout(t)
   }, [currentJob.id, loadSimilar])
 
   const handleApply = () => {

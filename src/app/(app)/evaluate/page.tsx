@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, ExternalLink, Link2, Loader2, Search, Sparkles, Filter, X, FileText, Briefcase, TrendingUp, FileCheck } from 'lucide-react'
+import { Copy } from 'lucide-react'
+import { CheckCircle2, Star, ExternalLink, Link2, Loader2, Search, Sparkles, FileText, FilePen, MessageSquare, Lightbulb, Mail, Send } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
-import { CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
+import { CareerOpsMarkdown, CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
 import toast from 'react-hot-toast'
 
 interface EvaluatedJob {
@@ -15,20 +16,6 @@ interface EvaluatedJob {
   description: string
   location?: string
   applyUrl: string
-}
-
-interface UnifiedJob {
-  id: string
-  title: string
-  company: string
-  location?: string
-  applyUrl: string
-  source: 'dashboard' | 'career-ops'
-  careerOpsScore: number | null
-  matchScore: number | null
-  reportNumber?: number | null
-  reportPath?: string | null
-  evaluatedAt: string
 }
 
 interface ResumeOption {
@@ -43,11 +30,6 @@ interface EvaluateResult {
   saved: { id: string; isNew: boolean }
 }
 
-interface JobApiResponse {
-  jobs: UnifiedJob[]
-  error?: string
-}
-
 interface ResumesApiResponse {
   resumes: ResumeOption[]
   error?: string
@@ -59,14 +41,24 @@ export default function EvaluatePage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<EvaluateResult | null>(null)
 
-  // List view state
-  const [showList, setShowList] = useState(false)
-  const [listLoading, setListLoading] = useState(false)
-  const [jobs, setJobs] = useState<UnifiedJob[]>([])
-  const [listError, setListError] = useState<string | null>(null)
-  const [threshold, setThreshold] = useState(0)
+  // Career-ops mode state
+  const [activeMode, setActiveMode] = useState<'report' | 'cover' | 'interview' | 'email' | 'upskill' | 'followup' | 'resume'>('report')
+  const [coverLoading, setCoverLoading] = useState(false)
+  const [coverResult, setCoverResult] = useState<string | null>(null)
+  const [interviewLoading, setInterviewLoading] = useState(false)
+  const [interviewResult, setInterviewResult] = useState<string | null>(null)
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [emailResult, setEmailResult] = useState<string | null>(null)
+  const [upskillLoading, setUpskillLoading] = useState(false)
+  const [upskillResult, setUpskillResult] = useState<string | null>(null)
+  const [followupLoading, setFollowupLoading] = useState(false)
+  const [followupResult, setFollowupResult] = useState<string | null>(null)
+  const [resumeLoading, setResumeLoading] = useState(false)
+  const [resumeResult, setResumeResult] = useState<string | null>(null)
+
+  // Resume-version picker — which resume to score/generate against. '' = latest.
   const [resumes, setResumes] = useState<ResumeOption[]>([])
-  const [selectedResumeId, setSelectedResumeId] = useState<string | 'all'>('all')
+  const [selectedResumeId, setSelectedResumeId] = useState('')
   const [resumesLoading, setResumesLoading] = useState(false)
 
   const handleEvaluate = async (e: React.FormEvent) => {
@@ -80,11 +72,19 @@ export default function EvaluatePage() {
     setLoading(true)
     setError(null)
     setResult(null)
+    // Reset mode results when evaluating a new job
+    setCoverResult(null)
+    setInterviewResult(null)
+    setEmailResult(null)
+    setUpskillResult(null)
+    setFollowupResult(null)
+    setResumeResult(null)
+    setActiveMode('report')
     try {
       const res = await fetch('/api/career-ops/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: trimmed }),
+        body: JSON.stringify({ url: trimmed, resumeId: selectedResumeId || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.report) {
@@ -99,6 +99,173 @@ export default function EvaluatePage() {
       toast.error('Something went wrong. Try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Career-ops mode handlers
+  const handleCoverLetter = async () => {
+    if (!result) return
+    setCoverLoading(true)
+    setCoverResult(null)
+    try {
+      const res = await fetch('/api/career-ops/cover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: result.saved.id,
+          url: result.job.applyUrl,
+          resumeId: selectedResumeId || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.coverLetter?.markdown) {
+        setCoverResult(data.coverLetter.markdown)
+        toast.success('Cover letter generated!')
+      } else {
+        toast.error(data?.error || 'Failed to generate cover letter')
+      }
+    } catch {
+      toast.error('Something went wrong. Try again.')
+    } finally {
+      setCoverLoading(false)
+    }
+  }
+
+  const handleInterviewPrep = async () => {
+    if (!result) return
+    setInterviewLoading(true)
+    setInterviewResult(null)
+    try {
+      const res = await fetch('/api/career-ops/interview-prep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: result.saved.id,
+          url: result.job.applyUrl,
+          resumeId: selectedResumeId || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.prep?.markdown) {
+        setInterviewResult(data.prep.markdown)
+        toast.success('Interview prep generated!')
+      } else {
+        toast.error(data?.error || 'Failed to generate interview prep')
+      }
+    } catch {
+      toast.error('Something went wrong. Try again.')
+    } finally {
+      setInterviewLoading(false)
+    }
+  }
+
+  const handleEmail = async () => {
+    if (!result) return
+    setEmailLoading(true)
+    setEmailResult(null)
+    try {
+      const res = await fetch('/api/career-ops/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: result.saved.id,
+          url: result.job.applyUrl,
+          resumeId: selectedResumeId || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.email?.markdown) {
+        setEmailResult(data.email.markdown)
+        toast.success('Email draft generated!')
+      } else {
+        toast.error(data?.error || 'Failed to generate email')
+      }
+    } catch {
+      toast.error('Something went wrong. Try again.')
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
+  const handleUpskill = async () => {
+    if (!result) return
+    setUpskillLoading(true)
+    setUpskillResult(null)
+    try {
+      const res = await fetch('/api/career-ops/upskill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetedUrl: result.job.applyUrl,
+          resumeId: selectedResumeId || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.upskill?.markdown) {
+        setUpskillResult(data.upskill.markdown)
+        toast.success('Upskill analysis generated!')
+      } else {
+        toast.error(data?.error || 'Failed to generate upskill analysis')
+      }
+    } catch {
+      toast.error('Something went wrong. Try again.')
+    } finally {
+      setUpskillLoading(false)
+    }
+  }
+
+  const handleFollowup = async () => {
+    if (!result) return
+    setFollowupLoading(true)
+    setFollowupResult(null)
+    try {
+      const res = await fetch('/api/career-ops/followup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationContext: `Applied to ${result.job.title} at ${result.job.company}`,
+          resumeId: selectedResumeId || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.followup?.markdown) {
+        setFollowupResult(data.followup.markdown)
+        toast.success('Follow-up strategy generated!')
+      } else {
+        toast.error(data?.error || 'Failed to generate follow-up')
+      }
+    } catch {
+      toast.error('Something went wrong. Try again.')
+    } finally {
+      setFollowupLoading(false)
+    }
+  }
+
+  const handleTailorResume = async () => {
+    if (!result) return
+    setResumeLoading(true)
+    setResumeResult(null)
+    try {
+      const res = await fetch('/api/career-ops/tailor-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: result.saved.id,
+          url: result.job.applyUrl,
+          resumeId: selectedResumeId || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.resume?.markdown) {
+        setResumeResult(data.resume.markdown)
+        toast.success('Tailored resume generated!')
+      } else {
+        toast.error(data?.error || 'Failed to tailor resume')
+      }
+    } catch {
+      toast.error('Something went wrong. Try again.')
+    } finally {
+      setResumeLoading(false)
     }
   }
 
@@ -117,47 +284,12 @@ export default function EvaluatePage() {
     }
   }, [])
 
-  const fetchJobs = useCallback(async () => {
-    setListLoading(true)
-    setListError(null)
-    try {
-      const resumeParam = selectedResumeId === 'all' ? '' : `&resumeId=${selectedResumeId}`
-      const res = await fetch(`/api/career-ops/jobs?minScore=${threshold}${resumeParam}`)
-      const data: JobApiResponse = await res.json().catch(() => ({ jobs: [] }))
-      if (res.ok) {
-        setJobs(data.jobs || [])
-      } else {
-        setListError(data.error || 'Failed to load jobs')
-        toast.error(data.error || 'Failed to load jobs')
-      }
-    } catch {
-      setListError('Something went wrong. Try again.')
-      toast.error('Something went wrong. Try again.')
-    } finally {
-      setListLoading(false)
-    }
-  }, [selectedResumeId, threshold])
-
   useEffect(() => {
-    if (showList) {
-      // Defer to avoid sync setState in effect body
-      const timer = setTimeout(() => {
-        fetchJobs()
-        fetchResumes()
-      }, 0)
-      return () => clearTimeout(timer)
-    }
-  }, [showList, fetchJobs, fetchResumes])
-
-  const scoreBadge = (score: number | null, label: string) => {
-    if (score === null) return null
-    return (
-      <Badge variant={score >= 3 ? 'success' : score >= 2 ? 'warning' : 'danger'} className="text-xs">
-        <TrendingUp className="w-2.5 h-2.5 mr-1" />
-        {label}: {score.toFixed(1)}
-      </Badge>
-    )
-  }
+    // Load resume versions for the picker on mount. Deferred so setState isn't
+    // called synchronously inside the effect.
+    const timer = setTimeout(fetchResumes, 0)
+    return () => clearTimeout(timer)
+  }, [fetchResumes])
 
   return (
     <div className="space-y-6 animate-in max-w-3xl">
@@ -170,26 +302,16 @@ export default function EvaluatePage() {
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Paste any job posting URL and get a career-ops score (0–5), archetype, legitimacy check, and the
-            full A–G report — scored against your latest resume. The job is saved to your Dashboard too.
+            full A–G report — scored against the resume version you pick. The job is saved to your Dashboard too.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowList(!showList)}
-          className="sm:shrink-0"
+        <Link
+          href="/matches"
+          className="inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 border border-gray-300 bg-transparent hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800 px-3 py-2 text-sm sm:shrink-0"
         >
-          {showList ? (
-            <>
-              <Briefcase className="w-4 h-4 mr-1.5" />
-              Hide evaluated jobs
-            </>
-          ) : (
-            <>
-              <Briefcase className="w-4 h-4 mr-1.5" />
-              Show evaluated jobs
-            </>
-          )}
-        </Button>
+          <Star className="w-4 h-4" aria-hidden="true" />
+          View best matches
+        </Link>
       </div>
 
       {/* URL form */}
@@ -210,6 +332,34 @@ export default function EvaluatePage() {
             {loading ? 'Scoring…' : 'Evaluate'}
           </Button>
         </div>
+
+        {/* Resume-version picker — which resume to score/generate against */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label
+            htmlFor="resumeVersion"
+            className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide sm:w-40 sm:self-center"
+          >
+            Resume version
+          </label>
+          <select
+            id="resumeVersion"
+            value={selectedResumeId}
+            onChange={e => setSelectedResumeId(e.target.value)}
+            disabled={resumesLoading}
+            className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pr-8 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent flex-1 sm:max-w-xs"
+          >
+            <option value="">Latest resume</option>
+            {resumes.map(r => (
+              <option key={r.id} value={r.id}>
+                {r.title || 'Untitled resume'} — {new Date(r.updatedAt).toLocaleDateString()}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 dark:text-gray-500 sm:ml-auto">
+            Score, cover letters and tailoring all use this version.
+          </p>
+        </div>
+
         <p className="text-xs text-gray-400 dark:text-gray-500">
           Works best with Greenhouse, Ashby and Lever links. LinkedIn and Indeed block automated access —
           for those, use the company&apos;s own careers page link.
@@ -290,158 +440,333 @@ export default function EvaluatePage() {
           )}
 
           <CareerOpsReport report={result.report} />
-        </div>
-      )}
 
-      {/* List view */}
-      {showList && (
-        <div className="space-y-4">
-          {/* Filter bar */}
-          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Filter className="w-5 h-5 text-gray-400" aria-hidden="true" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">Score threshold</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Show only jobs with career-ops or match score ≥ {threshold}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={threshold}
-                  onChange={e => setThreshold(parseFloat(e.target.value))}
-                  className="w-48 h-2 accent-primary-500"
-                  aria-label="Minimum score threshold"
-                />
-                <span className="text-lg font-mono font-semibold text-gray-900 dark:text-white w-10 text-right">
-                  {threshold.toFixed(1)}
-                </span>
-                {threshold > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setThreshold(0)}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
+          {/* Career-ops Mode Tabs */}
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setActiveMode('report')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'report'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                Report
+              </button>
+              <button
+                onClick={() => setActiveMode('cover')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'cover'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <FilePen className="w-3.5 h-3.5 inline mr-1.5" /> Cover Letter
+              </button>
+              <button
+                onClick={() => setActiveMode('interview')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'interview'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Interview Prep
+              </button>
+              <button
+                onClick={() => setActiveMode('email')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'email'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5 inline mr-1.5" /> Email
+              </button>
+              <button
+                onClick={() => setActiveMode('upskill')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'upskill'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <Lightbulb className="w-3.5 h-3.5 inline mr-1.5" /> Upskill
+              </button>
+              <button
+                onClick={() => setActiveMode('followup')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'followup'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5 inline mr-1.5" /> Follow-up
+              </button>
+              <button
+                onClick={() => setActiveMode('resume')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeMode === 'resume'
+                    ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-gray-50 dark:bg-gray-800'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 inline mr-1.5" /> Tailored CV
+              </button>
             </div>
 
-            {/* Resume filter */}
-            {resumes.length > 0 && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <FileCheck className="w-5 h-5 text-gray-400" aria-hidden="true" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Resume filter</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Filter Dashboard jobs by which resume they were scored against
-                    </p>
-                  </div>
-                </div>
-                <div className="relative">
-                  <select
-                    value={selectedResumeId}
-                    onChange={e => setSelectedResumeId(e.target.value)}
-                    disabled={resumesLoading}
-                    className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pr-10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
+            <div className="p-4">
+              {/* Cover Letter Mode */}
+              {activeMode === 'cover' && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleCoverLetter}
+                    isLoading={coverLoading}
+                    disabled={coverLoading || coverResult !== null}
+                    className="w-full sm:w-auto"
                   >
-                    <option value="all">All resumes</option>
-                    {resumes.map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.title || 'Untitled resume'} {new Date(r.updatedAt).toLocaleDateString()}
-                      </option>
-                    ))}
-                  </select>
-                  <FileCheck className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-            )}
-
-            {/* Jobs list */}
-            {listLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary-500 mr-2" />
-                <span className="text-gray-600 dark:text-gray-300">Loading evaluated jobs…</span>
-              </div>
-            ) : listError ? (
-              <div className="rounded-lg border border-danger-200 dark:border-danger-500/30 bg-danger-50 dark:bg-danger-500/10 p-4 text-sm text-danger-700 dark:text-danger-300">
-                {listError}
-              </div>
-            ) : jobs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p>No evaluated jobs match the threshold.</p>
-                <p className="text-xs mt-1">Try lowering the score threshold or evaluate a new job above.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {jobs.map(job => (
-                  <div
-                    key={job.id}
-                    className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                          {job.title}
-                        </h3>
-                        <p className="text-sm text-primary-600 dark:text-primary-400 truncate">
-                          {job.company}
-                        </p>
-                        {job.location && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{job.location}</p>
-                        )}
+                    {coverLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {coverResult ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Cover Letter Generated
+                      </>
+                    ) : (
+                      <>
+                        <FilePen className="w-4 h-4 mr-2" />
+                        Generate Cover Letter
+                      </>
+                    )}
+                  </Button>
+                  {coverResult && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Tailored Cover Letter</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(coverResult)}
+                        >
+                          <Copy className="w-4 h-4 mr-1.5" />
+                          Copy
+                        </Button>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {scoreBadge(job.careerOpsScore, 'CO')}
-                        {scoreBadge(job.matchScore, 'Match')}
-                        <Badge variant={job.source === 'career-ops' ? 'info' : 'gray'} className="text-xs">
-                          {job.source === 'career-ops' ? (
-                            <>
-                              <FileText className="w-2.5 h-2.5 mr-1" />
-                              career-ops
-                            </>
-                          ) : (
-                            <>
-                              <Briefcase className="w-2.5 h-2.5 mr-1" />
-                              Dashboard
-                            </>
-                          )}
-                        </Badge>
-                        {job.reportPath && (
-                          <Link
-                            href={`/api/career-ops/report?path=${encodeURIComponent(job.reportPath)}`}
-                            className="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                            target="_blank"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            Report
-                          </Link>
-                        )}
-                        {job.applyUrl && (
-                          <a
-                            href={job.applyUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Open
-                          </a>
-                        )}
-                      </div>
+                      <CareerOpsMarkdown markdown={coverResult} />
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+
+              {/* Interview Prep Mode */}
+              {activeMode === 'interview' && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleInterviewPrep}
+                    isLoading={interviewLoading}
+                    disabled={interviewLoading || interviewResult !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {interviewLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {interviewResult ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Interview Prep Generated
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Generate Interview Prep
+                      </>
+                    )}
+                  </Button>
+                  {interviewResult && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Interview Preparation</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(interviewResult)}
+                        >
+                          <Copy className="w-4 h-4 mr-1.5" />
+                          Copy
+                        </Button>
+                      </div>
+                      <CareerOpsMarkdown markdown={interviewResult} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Email Mode */}
+              {activeMode === 'email' && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleEmail}
+                    isLoading={emailLoading}
+                    disabled={emailLoading || emailResult !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {emailLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {emailResult ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Email Draft Generated
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4 mr-2" />
+                        Generate Email Draft
+                      </>
+                    )}
+                  </Button>
+                  {emailResult && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Application Email Draft</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(emailResult)}
+                        >
+                          <Copy className="w-4 h-4 mr-1.5" />
+                          Copy
+                        </Button>
+                      </div>
+                      <CareerOpsMarkdown markdown={emailResult} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Upskill Mode */}
+              {activeMode === 'upskill' && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleUpskill}
+                    isLoading={upskillLoading}
+                    disabled={upskillLoading || upskillResult !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {upskillLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {upskillResult ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Upskill Analysis Generated
+                      </>
+                    ) : (
+                      <>
+                        <Lightbulb className="w-4 h-4 mr-2" />
+                        Generate Upskill Analysis
+                      </>
+                    )}
+                  </Button>
+                  {upskillResult && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Skill Gap Analysis</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(upskillResult)}
+                        >
+                          <Copy className="w-4 h-4 mr-1.5" />
+                          Copy
+                        </Button>
+                      </div>
+                      <CareerOpsMarkdown markdown={upskillResult} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Follow-up Mode */}
+              {activeMode === 'followup' && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleFollowup}
+                    isLoading={followupLoading}
+                    disabled={followupLoading || followupResult !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {followupLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {followupResult ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Follow-up Strategy Generated
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Generate Follow-up Strategy
+                      </>
+                    )}
+                  </Button>
+                  {followupResult && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Follow-up Cadence & Drafts</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(followupResult)}
+                        >
+                          <Copy className="w-4 h-4 mr-1.5" />
+                          Copy
+                        </Button>
+                      </div>
+                      <CareerOpsMarkdown markdown={followupResult} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tailored CV Mode */}
+              {activeMode === 'resume' && (
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleTailorResume}
+                    isLoading={resumeLoading}
+                    disabled={resumeLoading || resumeResult !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {resumeLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {resumeResult ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Tailored CV Generated
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Tailor My CV to This Job
+                      </>
+                    )}
+                  </Button>
+                  {resumeResult && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Tailored CV</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigator.clipboard.writeText(resumeResult)}
+                        >
+                          <Copy className="w-4 h-4 mr-1.5" />
+                          Copy
+                        </Button>
+                      </div>
+                      <CareerOpsMarkdown markdown={resumeResult} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
+
     </div>
   )
 }
