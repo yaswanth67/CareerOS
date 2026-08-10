@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { fetchAllJobs, deactivateExpiredJobs, getJobStats } from '@/lib/job-fetcher'
 import { checkJobLinks } from '@/lib/job-fetcher/link-checker'
 import { autoScoreAllUsers } from '@/lib/job-fetcher/auto-score'
+import { classifySponsorshipForJobs } from '@/lib/job-fetcher/sponsorship'
 
 // This endpoint should be called by a cron service (e.g., Vercel Cron, GitHub Actions, etc.)
 // It fetches jobs from all providers, deactivates expired ones, and runs the
@@ -32,6 +33,11 @@ export async function GET(request: NextRequest) {
     const scoredByUser = await autoScoreAllUsers()
     const totalScored = scoredByUser.reduce((sum, u) => sum + u.scored, 0)
 
+    // Classify a batch of unclassified jobs for visa sponsorship (keyword + AI).
+    // The per-run cap keeps the cron fast; scripts/backfill-sponsorship.ts covers
+    // the full backlog locally.
+    const sponsorshipClassified = await classifySponsorshipForJobs({ limit: 50 })
+
     // Get updated stats
     const stats = await getJobStats()
 
@@ -40,6 +46,7 @@ export async function GET(request: NextRequest) {
       deactivatedCount,
       linkCheck: { checked: linkCheck.checked, broken: linkCheck.broken, deactivated: linkCheck.deactivated },
       jobsScored: totalScored,
+      sponsorshipClassified,
       stats,
     })
 
@@ -49,6 +56,7 @@ export async function GET(request: NextRequest) {
       deactivatedCount,
       linkCheck: { checked: linkCheck.checked, broken: linkCheck.broken, deactivated: linkCheck.deactivated },
       jobsScored: totalScored,
+      sponsorshipClassified,
       stats,
       timestamp: new Date().toISOString(),
     })

@@ -5,6 +5,10 @@ import { ashbyProvider } from '@/lib/job-providers/ashby'
 import { leverProvider } from '@/lib/job-providers/lever'
 import { wellfoundProvider } from '@/lib/job-providers/wellfound'
 import { companyDirectProvider } from '@/lib/job-providers/company-direct'
+import { remotiveProvider } from '@/lib/job-providers/remotive'
+import { remoteokProvider } from '@/lib/job-providers/remoteok'
+import { arbeitnowProvider } from '@/lib/job-providers/arbeitnow'
+import { jobicyProvider } from '@/lib/job-providers/jobicy'
 import { validateApplyUrl } from '@/lib/job-providers/base'
 
 export const providers = [
@@ -13,6 +17,10 @@ export const providers = [
   leverProvider,
   wellfoundProvider,
   companyDirectProvider,
+  remotiveProvider,
+  remoteokProvider,
+  arbeitnowProvider,
+  jobicyProvider,
 ]
 
 export interface FetchResult {

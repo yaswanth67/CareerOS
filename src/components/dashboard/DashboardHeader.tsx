@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, RefreshCw, Loader2, Sparkles, ShieldCheck, Bookmark, Send } from 'lucide-react'
+import { Plus, RefreshCw, Loader2, Sparkles, Bookmark, Send } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
@@ -16,29 +16,9 @@ export function DashboardHeader() {
   const searchParams = useSearchParams()
   const [refreshing, setRefreshing] = useState(false)
   const [scoring, setScoring] = useState(false)
-  const [checking, setChecking] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const [roleName, setRoleName] = useState<string>('')
 
   const currentStatus = (searchParams.get('status') || '') as AppStatus | ''
-
-  // Load the user's most recent resume title to greet them by their target role
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/resumes')
-      .then(res => res.json())
-      .then(data => {
-        if (cancelled) return
-        const resumes = data?.resumes ?? []
-        if (resumes.length > 0) {
-          setRoleName(resumes[0].title)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -61,35 +41,16 @@ export function DashboardHeader() {
           ? `Fetched jobs — ${total.toLocaleString()} active, scored ${scored.toLocaleString()}`
           : `Fetched jobs — ${total.toLocaleString()} active now`
       )
+      // Link check runs automatically with the fetch — surface any cleanup it did.
+      const deactivated = (data?.linkCheck?.deactivated ?? 0) as number
+      if (deactivated > 0) {
+        toast.success(`Removed ${deactivated} job${deactivated === 1 ? '' : 's'} with broken apply links`)
+      }
       router.replace('/dashboard')
     } catch {
       toast.error('Failed to refresh jobs')
     } finally {
       setRefreshing(false)
-    }
-  }
-
-  const handleCheckLinks = async () => {
-    setChecking(true)
-    try {
-      const res = await fetch('/api/jobs/check-links', { method: 'POST' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(data?.error || 'Failed to check links')
-        return
-      }
-      if (data.deactivated > 0) {
-        toast.success(`Removed ${data.deactivated} job${data.deactivated === 1 ? '' : 's'} with broken apply links`)
-      } else if (data.broken === 0) {
-        toast.success(`Checked ${data.checked} links — all good`)
-      } else {
-        toast.success(`Checked ${data.checked} links — ${data.broken} broken (some unreachable, left in place)`)
-      }
-      router.refresh()
-    } catch {
-      toast.error('Failed to check links')
-    } finally {
-      setChecking(false)
     }
   }
 
@@ -131,7 +92,7 @@ export function DashboardHeader() {
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Welcome back, {roleName || session?.user?.name?.split(' ')[0] || 'there'}!
+          Welcome back, {session?.user?.name?.split(' ')[0] || 'there'}!
         </h1>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
           Here are your latest job matches
@@ -202,19 +163,6 @@ export function DashboardHeader() {
                 <RefreshCw className="w-4 h-4" />
               )}
               {refreshing ? 'Fetching...' : 'Refresh Jobs'}
-            </button>
-            <button
-              className="btn-outline"
-              onClick={handleCheckLinks}
-              disabled={checking}
-              title="Check every job's apply link and remove broken ones"
-            >
-              {checking ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ShieldCheck className="w-4 h-4" />
-              )}
-              {checking ? 'Checking...' : 'Check Links'}
             </button>
             <button
               className="btn-outline"

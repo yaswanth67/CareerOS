@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { StatsCards } from '@/components/dashboard/StatsCards'
 import { JobList } from '@/components/dashboard/JobList'
+import { ActiveFilters } from '@/components/dashboard/ActiveFilters'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { getJobStats } from '@/lib/job-fetcher'
 import { getCurrentUser } from '@/lib/auth'
@@ -38,6 +39,7 @@ export default async function DashboardPage({
           applications: applicationsCount,
         }}
       />
+      <ActiveFilters />
       <Suspense fallback={<DashboardSkeleton />}>
         <JobList searchParams={params} />
       </Suspense>
