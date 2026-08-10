@@ -1,5 +1,6 @@
 import { JobFetchFilters, RawJob, JobProvider, ExperienceLevel, RoleType } from '@/types'
 import Anthropic from '@anthropic-ai/sdk'
+import { htmlToText } from '@/lib/utils'
 
 // Guard-rail for apply links: every URL stored on a Job must look like a real,
 // job-specific posting. Fabricated fallbacks (homepage roots, careers landing
@@ -207,6 +208,14 @@ export class BaseJobProvider implements JobProviderAdapter {
     }
 
     return 'SDE'
+  }
+
+  // Strip HTML/entities from a provider's description. Keeps paragraph breaks
+  // and list bullets (htmlToText) so the stored description reads like a real
+  // posting instead of one run-on line — which also lets extractRequirements
+  // find the bulleted requirement lists below.
+  protected stripHtml(html: string): string {
+    return htmlToText(html)
   }
 
   protected extractRequirements(content: string): string[] {

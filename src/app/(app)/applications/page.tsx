@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { AppStatus } from '@/types'
+import { ApplicationInsights } from '@/components/dashboard/ApplicationInsights'
 import toast from 'react-hot-toast'
 
 const STATUS_META: Record<AppStatus, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
@@ -140,6 +141,9 @@ export default function ApplicationsPage() {
           Track every job you&apos;ve saved or applied to — from initial save to offer
         </p>
       </div>
+
+      {/* Funnel, 14-day activity, and CSV export — computed client-side */}
+      <ApplicationInsights applications={applications} visible={visible} />
 
       {/* Position + location filters (both optional) */}
       <div className="grid gap-3 sm:grid-cols-2">

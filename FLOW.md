@@ -7,9 +7,10 @@ importantly — **where your resume is used** at every step.
 
 MatchIQ is a personal job-search assistant. It:
 
-1. **Fetches live job listings** from public job APIs (Greenhouse, Ashby, Lever, and
-   direct company career APIs like Amazon). Every apply link is validated so broken
-   links never reach the feed.
+1. **Fetches live job listings** from public job APIs (Greenhouse, Ashby, Lever,
+   and direct company career APIs like Amazon — plus remote job boards Remotive,
+   RemoteOK, Arbeitnow, and Jobicy for extra volume). Every apply link is
+   validated so broken links never reach the feed.
 2. **Parses the resumes you upload** (PDF, DOCX, or text) into structured data.
 3. **Scores every job against your resume automatically** — a fast offline heuristic
    runs the moment jobs are fetched (AI can be used for deeper reasoning) — so you
@@ -54,6 +55,8 @@ resume text leaves your computer except when AI scoring is enabled (see Privacy 
                  │ Job feed (full-width vertical cards) shows     │
                  │  title, company, role tag + % match, reasoning │
                  │  Filters: role, level, country, remote, posted │
+                 │  company, sponsorship, min score, sort (score/  │
+                 │  newest), New Grad & Senior quick chips         │
                  └─────────────────────────┬──────────────────────┘
                                            ▼
                  ┌────────────────────────────────────────────────┐
@@ -74,21 +77,45 @@ resume text leaves your computer except when AI scoring is enabled (see Privacy 
 | `/resumes` · `/resumes/new` | List / upload + edit resumes |
 | `/preferences` | Target roles, locations, remote/visa, salary, exclusions |
 | `/applications` | Your saved & applied jobs — change status, add notes, remove |
-| `/api/jobs` `POST {action:"fetch"}` | Fetch fresh jobs **+ auto-score** them against your resume |
+| `/api/jobs` `POST {action:"fetch"}` | Fetch fresh jobs **+ auto-score** them against your resume **+ classify visa sponsorship** **+ check apply links** |
 | `/api/jobs` `POST {action:"score"}` | Score every active job you don't have a match for |
-| `/api/jobs/check-links` `POST` | Guard-rail: check every apply link, deactivate broken ones |
+| `/api/jobs` `POST {action:"sponsorship"}` | Classify the next batch of unclassified jobs' visa sponsorship |
+| `/api/jobs/companies` `GET` | Distinct active company names (feeds the company filter's autocomplete) |
 | `/api/applications` `POST` | Save / mark applied (`{status:'SAVED'|'APPLIED', …}`) |
 | `/api/applications/[id]` `PATCH`/`DELETE` | Change status or remove an application |
 | `/api/cron/fetch-jobs` | Scheduled job refresh **+ auto-score + link check** |
+
+### Visa-sponsorship classification
+
+Every job has a `visaSponsored` flag: `true` (confirmed the company sponsors),
+`false` (confirmed it doesn't), or `NULL` (unclassified). The flag drives the
+**Visa sponsorship** filter and the green **Visa sponsorship** badge on cards.
+
+Classification is **AI-first** (`src/lib/job-fetcher/sponsorship.ts`):
+
+1. **Keyword pre-screen** — a conservative pass over the full title/company/
+   description catches the unambiguous cases ("we are unable to provide visa
+   sponsorship" → `false`, "we will sponsor H-1B" → `true`) with zero AI cost.
+   This is the workhorse: most postings that mention sponsorship state it
+   plainly.
+2. **AI pass** — the remaining jobs go to Claude in batches of ~40, which answers
+   `true` / `false` / `null` per posting. Postings that never mention sponsorship
+   (the majority) correctly come back `null` and stay out of the filter.
+
+The fetch action, the cron, and a manual `POST /api/jobs {action:"sponsorship"}`
+each classify a small batch; `npm run backfill:sponsorship` covers the whole
+backlog in one pass (`--keyword-only` skips the AI for an instant sweep of the
+obvious cases). Every failure path is soft — an AI error just leaves the row
+`NULL`, never breaks the fetch.
 
 ### Guard-rail: broken apply links
 
 Every apply URL must pass `validateApplyUrl()` (`src/lib/job-providers/base.ts`)
 before it is saved — fabricated homepage links, placeholder ids (`/jobs/123`), and
-malformed URLs are rejected at fetch time. A separate link-checker
-(`scripts/check-job-links.ts`, or the dashboard **Check Links** button → `POST
-/api/jobs/check-links`) then HTTP-checks every active job and **deactivates** the
-ones that 404. The scheduled cron runs the same check every 6h. Bot-blocked
+malformed URLs are rejected at fetch time. A link-checker then runs automatically
+on every **Refresh Jobs** action (plus the manual `scripts/check-job-links.ts`),
+HTTP-checking the most recent active jobs and **deactivating** the ones that 404.
+The scheduled cron runs the same check over the full database every 6h. Bot-blocked
 (403/429) and server-error (5xx) links are reported but left in place.
 
 ---
@@ -197,21 +224,22 @@ or remove the entry.
   the scheduled cron deactivates expired postings.
 - **Status filters** — All Jobs / Saved / Applied. **All Jobs hides jobs you've
   already applied to**; Applied shows them.
-- **Refresh Jobs** — fetches real listings from Greenhouse, Ashby, Lever, and
-  Amazon, then **auto-scores every new job** against your most recent resume.
+- **Refresh Jobs** — fetches real listings from Greenhouse, Ashby, Lever, Amazon,
+  Remotive, RemoteOK, Arbeitnow, and Jobicy, then **auto-scores every new job**
+  against your most recent resume, **classifies visa sponsorship**, and **checks
+  apply links** (deactivating broken ones).
 - **Score Matches** — instantly scores any active job you don't have a match for
   yet (fast heuristic, no AI call).
-- **Check Links** — runs the apply-link guard-rail over every active job and
-  deactivates the ones with broken/fabricated links.
 - **Strong Matches** — jobs scored ≥80% against any of your resumes.
 - **Applications** — count of saved/applied jobs.
 
 ### 4.3 Job feed & filters
 - **Use case:** Find jobs that fit your profile. Filter by role type, experience
   level, location, **country**, remote-only, posted-within, status
-  (All/Saved/Applied), and minimum match score; sort by score descending.
+  (All/Saved/Applied), and minimum match score.
 - **Layout:** full-width vertical cards (title + company + role tag + score),
-  no pagination cap — every matching job is listed.
+  **newest first**, paginated 25 at a time with a **Load More** button (each click
+  appends the next batch so all jobs are browsable without rendering ~11k at once).
 - **Apply** — opens the employer's own application page in a new tab and queues
   the **"Have you applied?"** popup; answering **Yes** auto-tracks it as APPLIED.
 
@@ -244,11 +272,14 @@ or remove the entry.
 - **Job providers:** `greenhouse` / `ashby` / `lever` hit real public APIs;
   `company-direct` is Amazon only (its `search.json` returns `job_path` +
   `url_next_step`, which are turned into real apply URLs); `wellfound` has no
-  public API and returns nothing. Provider board/company lists are pruned to
-  slugs **verified live** — dead boards (e.g. Notion/Linear/Snowflake moved to
-  Ashby) are removed so stale links are never refetched.
+  public API and returns nothing. **Remote boards:** `remotive` (remotive.com),
+  `remoteok` (remoteok.com), `arbeitnow` (arbeitnow.com), `jobicy` (jobicy.com)
+  — all verified live at implementation time. Provider board/company lists are
+  pruned to slugs **verified live** — dead boards (e.g. Notion/Linear/Snowflake
+  moved to Ashby) are removed so stale links are never refetched.
 - **Guard-rail:** `npm run check-links` (report) / `npm run check-links:fix`
   (report + deactivate). `validateApplyUrl()` shape-checks at save time;
   `src/lib/job-fetcher/link-checker.ts` HTTP-checks on demand.
 - **Cron:** `vercel.json` schedules `GET /api/cron/fetch-jobs` every 6h; requires
-  `CRON_SECRET` if set. It also runs the link check and deactivates broken links.
+  `CRON_SECRET` if set. It fetches new jobs, **auto-scores them**, **classifies
+  visa sponsorship for a batch**, and deactivates broken links.

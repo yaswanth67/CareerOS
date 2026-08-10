@@ -71,6 +71,8 @@ model Job {
   fetchedAt       DateTime      @default(now())
   expiresAt       DateTime?
   isActive        Boolean       @default(true)
+  // null = not yet classified; true = likely sponsors visas (AI/keyword detected)
+  visaSponsored   Boolean?
   applications    Application[]
   matches         Match[]
 
@@ -78,6 +80,7 @@ model Job {
   @@index([provider, isActive])
   @@index([roleType, isActive])
   @@index([location, isActive])
+  @@index([visaSponsored, isActive])
 }
 
 model Match {

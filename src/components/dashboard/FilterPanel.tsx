@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Filter, MapPin, Briefcase, Star, Globe, Clock, Target, Bookmark, Send, Loader2 } from 'lucide-react'
+import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { RoleType, ExperienceLevel, AppStatus } from '@/types'
+import { RoleType, AppStatus } from '@/types'
 import toast from 'react-hot-toast'
 
-const roleOptions: { value: RoleType; label: string }[] = [
+export const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'SDE', label: 'Software Engineer' },
   { value: 'AI_ENGINEER', label: 'AI Engineer' },
   { value: 'ML_ENGINEER', label: 'ML Engineer' },
@@ -26,15 +26,7 @@ const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'OTHER', label: 'Other' },
 ]
 
-const experienceOptions: { value: ExperienceLevel; label: string }[] = [
-  { value: 'ENTRY', label: 'Entry Level' },
-  { value: 'MID', label: 'Mid Level' },
-  { value: 'SENIOR', label: 'Senior' },
-  { value: 'STAFF', label: 'Staff' },
-  { value: 'PRINCIPAL', label: 'Principal' },
-]
-
-const scoreOptions = [
+export const scoreOptions = [
   { value: '0', label: 'All Scores' },
   { value: '80', label: 'Strong Match (80+)' },
   { value: '60', label: 'Good Match (60+)' },
@@ -48,7 +40,7 @@ const postedOptions = [
   { value: '168', label: 'Last 7 days' },
 ]
 
-const statusOptions: { value: AppStatus | ''; label: string; icon?: React.ElementType }[] = [
+export const statusOptions: { value: AppStatus | ''; label: string; icon?: React.ElementType }[] = [
   { value: '', label: 'All Jobs' },
   { value: 'SAVED', label: 'Saved', icon: Bookmark },
   { value: 'APPLIED', label: 'Applied', icon: Send },
@@ -61,34 +53,30 @@ const statusOptions: { value: AppStatus | ''; label: string; icon?: React.Elemen
 interface Filters {
   q: string
   roles: RoleType[]
-  exp: ExperienceLevel[]
   loc: string
   remote: boolean
   score: string
   posted: string
   status: AppStatus | ''
-  countries: string[]
+  sponsorship: boolean
 }
 
 interface FilterPanelProps {
   isOpen: boolean
   onClose: () => void
-  availableCountries?: string[]
 }
 
 function readParams(searchParams: URLSearchParams): Filters {
   const status = searchParams.get('status') || ''
-  const countries = searchParams.get('countries')?.split(',').filter(Boolean) || []
   return {
     q: searchParams.get('q') || '',
     roles: (searchParams.get('roles')?.split(',').filter(Boolean) as RoleType[]) || [],
-    exp: (searchParams.get('exp')?.split(',').filter(Boolean) as ExperienceLevel[]) || [],
     loc: searchParams.get('loc') || '',
     remote: searchParams.get('remote') === '1',
     score: searchParams.get('score') || '0',
     posted: searchParams.get('posted') || '',
     status: (['SAVED', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'WITHDRAWN'].includes(status) ? status : '') as AppStatus | '',
-    countries,
+    sponsorship: searchParams.get('sponsorship') === '1',
   }
 }
 
@@ -96,18 +84,17 @@ function toQuery(f: Filters): string {
   const params = new URLSearchParams()
   if (f.q.trim()) params.set('q', f.q.trim())
   if (f.roles.length) params.set('roles', f.roles.join(','))
-  if (f.exp.length) params.set('exp', f.exp.join(','))
   if (f.loc.trim()) params.set('loc', f.loc.trim())
   if (f.remote) params.set('remote', '1')
   if (f.score && f.score !== '0') params.set('score', f.score)
   if (f.posted) params.set('posted', f.posted)
   if (f.status) params.set('status', f.status)
-  if (f.countries.length) params.set('countries', f.countries.join(','))
+  if (f.sponsorship) params.set('sponsorship', '1')
   const s = params.toString()
   return s ? `?${s}` : ''
 }
 
-export function FilterPanel({ isOpen, onClose, availableCountries = [] }: FilterPanelProps) {
+export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [filters, setFilters] = useState<Filters>(() => readParams(new URLSearchParams(searchParams.toString())))
@@ -117,14 +104,13 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
 
   const activeFiltersCount =
     filters.roles.length +
-    filters.exp.length +
     (filters.loc ? 1 : 0) +
     (filters.remote ? 1 : 0) +
     (filters.score !== '0' ? 1 : 0) +
     (filters.posted ? 1 : 0) +
     (filters.status ? 1 : 0) +
     (filters.q ? 1 : 0) +
-    (filters.countries.length ? 1 : 0)
+    (filters.sponsorship ? 1 : 0)
 
   const commit = (next: Filters) => {
     setFilters(next)
@@ -140,26 +126,23 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
     commit({ ...filters, roles })
   }
 
-  const toggleExperience = (exp: ExperienceLevel) => {
-    const next = filters.exp.includes(exp)
-      ? filters.exp.filter(e => e !== exp)
-      : [...filters.exp, exp]
-    commit({ ...filters, exp: next })
-  }
-
   const applyTextFilters = () => {
     commit({ ...filters, q: searchInput, loc: locationInput })
   }
 
   const clearAllFilters = () => {
-    const empty: Filters = { q: '', roles: [], exp: [], loc: '', remote: false, score: '0', posted: '', status: '', countries: [] }
+    const empty: Filters = {
+      q: '', roles: [], loc: '', remote: false, score: '0', posted: '', status: '',
+      sponsorship: false,
+    }
     commit(empty)
   }
 
   const handleSaveAndRefresh = async () => {
     setSaving(true)
     try {
-      // Fetch new jobs
+      // Fetch new jobs — the apply-link guard-rail runs automatically as part
+      // of the fetch, so there's no separate check-links step.
       const fetchRes = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,16 +150,13 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
       })
       const fetchData = await fetchRes.json().catch(() => ({}))
 
-      // Check links
-      const checkRes = await fetch('/api/jobs/check-links', { method: 'POST' })
-      const checkData = await checkRes.json().catch(() => ({}))
-
       if (fetchRes.ok) {
         const total = (fetchData?.stats?.activeJobs ?? 0) as number
         toast.success(`Refreshed — ${total.toLocaleString()} active jobs`)
       }
-      if (checkRes.ok && checkData.deactivated > 0) {
-        toast.success(`Removed ${checkData.deactivated} job${checkData.deactivated === 1 ? '' : 's'} with broken links`)
+      const deactivated = (fetchData?.linkCheck?.deactivated ?? 0) as number
+      if (deactivated > 0) {
+        toast.success(`Removed ${deactivated} job${deactivated === 1 ? '' : 's'} with broken links`)
       }
       router.refresh()
     } catch {
@@ -187,17 +167,6 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
     }
   }
 
-  const countryOptions = availableCountries.length > 0 ? availableCountries : [
-    'United States', 'Canada', 'United Kingdom', 'Germany', 'France', 'India',
-    'Australia', 'Singapore', 'Japan', 'Ireland', 'Netherlands', 'Switzerland',
-    'Sweden', 'Spain', 'Poland', 'Brazil', 'Mexico', 'Israel', 'United Arab Emirates',
-    'South Korea', 'China', 'New Zealand', 'Denmark', 'Norway', 'Belgium',
-    'Austria', 'Portugal', 'Italy', 'Finland', 'Malaysia', 'Philippines',
-    'Thailand', 'Vietnam', 'Indonesia', 'Hong Kong', 'Taiwan', 'South Africa',
-    'Argentina', 'Chile', 'Colombia', 'Costa Rica', 'Peru', 'Nigeria', 'Kenya',
-    'Egypt', 'Global/Remote',
-  ]
-
   if (!isOpen) return null
 
   return (
@@ -207,7 +176,7 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed right-0 top-0 z-50 w-full max-w-md h-full bg-white dark:bg-gray-900 shadow-xl slide-in-right flex flex-col">
+      <div className="fixed right-0 top-0 z-50 w-full max-w-md max-h-screen bg-white dark:bg-gray-900 shadow-xl slide-in-right flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
@@ -302,30 +271,6 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
             </div>
           </div>
 
-          {/* Experience Level */}
-          <div>
-            <label className="label flex items-center gap-1.5">
-              <Star className="w-4 h-4" />
-              Experience Level
-            </label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {experienceOptions.map((exp) => (
-                <button
-                  key={exp.value}
-                  onClick={() => toggleExperience(exp.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
-                    filters.exp.includes(exp.value)
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                  )}
-                >
-                  {exp.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Location & Remote */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -361,32 +306,25 @@ export function FilterPanel({ isOpen, onClose, availableCountries = [] }: Filter
             </div>
           </div>
 
-          {/* Countries Filter */}
+          {/* Visa Sponsorship */}
           <div>
             <label className="label flex items-center gap-1.5">
-              <Globe className="w-4 h-4" />
-              Countries
+              <ShieldCheck className="w-4 h-4" />
+              Visa Sponsorship
             </label>
-            <div className="flex flex-wrap gap-2 mt-2 max-h-48 overflow-y-auto">
-              {countryOptions.map((country) => (
-                <button
-                  key={country}
-                  onClick={() => {
-                    const countries = filters.countries.includes(country)
-                      ? filters.countries.filter(c => c !== country)
-                      : [...filters.countries, country]
-                    commit({ ...filters, countries })
-                  }}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
-                    filters.countries.includes(country)
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                  )}
-                >
-                  {country}
-                </button>
-              ))}
+            <div className="mt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.sponsorship}
+                  onChange={(e) => commit({ ...filters, sponsorship: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Sponsorship available</span>
+              </label>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                AI-detected — only jobs confirmed to sponsor visas
+              </p>
             </div>
           </div>
 

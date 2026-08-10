@@ -828,3 +828,67 @@ export function getAllCountries(jobs: Array<{ location: string | null; isRemote:
 
   return Array.from(countries).sort()
 }
+
+/**
+ * Trigger a browser download of a text file (cover letters, interview prep, CSV exports).
+ * Creates a Blob and clicks a temporary anchor, then revokes the object URL.
+ */
+export function downloadFile(filename: string, text: string, mime = 'text/plain'): void {
+  const blob = new Blob([text], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Convert an HTML job description into clean, readable plain text, preserving
+ * paragraph breaks and list bullets instead of collapsing to one run-on line.
+ *
+ * Safe to run on any string: with no tags present it only decodes entities and
+ * normalizes whitespace, so it is idempotent over already-cleaned descriptions.
+ * Pure string operations — usable on both server (ingest) and client (display).
+ */
+export function htmlToText(html: string): string {
+  if (!html) return ''
+  let text = html
+
+  // Decode common entities BEFORE stripping tags — providers like Arbeitnow
+  // HTML-encode the markup inside JSON (&lt;div&gt;…), so decoding first lets the
+  // tag-strip below actually see the tags.
+  const entities: Record<string, string> = {
+    '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
+    '&#39;': "'", '&#x27;': "'", '&nbsp;': ' ', '&ensp;': ' ', '&emsp;': ' ',
+    '&hellip;': '…', '&mdash;': '—', '&ndash;': '–', '&rsquo;': "'", '&lsquo;': '‘',
+    '&ldquo;': '“', '&rdquo;': '”', '&raquo;': '»', '&laquo;': '«', '&bull;': '•',
+    '&middot;': '·', '&reg;': '®', '&copy;': '©', '&eacute;': 'é', '&egrave;': 'è',
+  }
+  text = text.replace(/&(?:[a-z]+|#\d+|#x[0-9a-f]+);/gi, m => {
+    const lower = m.toLowerCase()
+    if (entities[lower]) return entities[lower]
+    if (lower.startsWith('&#x')) return String.fromCharCode(parseInt(lower.slice(3), 16))
+    if (lower.startsWith('&#')) return String.fromCharCode(parseInt(lower.slice(2), 10))
+    return m
+  })
+
+  // Block-level closes become paragraph breaks; <br>/<hr> become line breaks.
+  text = text.replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|ul|ol|section|article|blockquote|tr|table|header|footer|figcaption)>/gi, '\n')
+  text = text.replace(/<(br|hr)\s*\/?>/gi, '\n')
+  // List items become bullets.
+  text = text.replace(/<li[^>]*>/gi, '\n• ')
+
+  // Drop everything else that looks like a tag (open tags, attributes, scripts).
+  text = text.replace(/<[^>]*>/g, ' ')
+
+  // Collapse spaces/tabs, keep single newlines, cap runs of blank lines.
+  text = text.replace(/[ \t]+/g, ' ')
+  text = text.replace(/\s*\n\s*/g, '\n')
+  text = text.replace(/\n{3,}/g, '\n\n')
+
+  // Trim per line and overall.
+  return text.split('\n').map(l => l.trim()).join('\n').trim()
+}

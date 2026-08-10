@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target, X } from 'lucide-react'
+import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target, X, ShieldCheck, Eye, FileText } from 'lucide-react'
 import { formatRelativeTime, getScoreColor, getScoreLabel, getRoleLabel, getExperienceLabel } from '@/lib/utils'
 import { RoleType, ExperienceLevel } from '@/types'
+import { JobDetailDrawer } from './JobDetailDrawer'
+import { TailorResumeDrawer } from './TailorResumeDrawer'
 import toast from 'react-hot-toast'
 
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
@@ -46,6 +48,8 @@ export interface Job {
     missingSkills: string[]
   }
   applications?: { id: string; status: string }[]
+  /** true = confirmed to offer visa sponsorship (AI/keyword detected) */
+  visaSponsored?: boolean | null
 }
 
 interface JobCardProps {
@@ -62,6 +66,8 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
   const [applying, setApplying] = useState(false)
   const [reverting, setReverting] = useState(false)
   const [showAppliedPrompt, setShowAppliedPrompt] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [tailorOpen, setTailorOpen] = useState(false)
   const score = job.match?.score || 0
   const hasMatch = !!job.match
 
@@ -199,16 +205,21 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
     <>
       <Card className="card-hover overflow-hidden">
         <CardContent className="p-5">
-          {/* Header — title first so the role is always visible */}
+          {/* Header — title first so the role is always visible; clicking opens the detail drawer */}
           <div className="flex items-start justify-between gap-4 mb-1">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-white">
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              className="flex-1 min-w-0 text-left group"
+              title="Open full details, AI assists, and similar jobs"
+            >
+              <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                 {job.title}
               </h3>
-              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium mt-0.5">
+              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium mt-0.5 group-hover:underline">
                 {job.company}
               </p>
-            </div>
+            </button>
             {job.provider && (
               <Badge variant="gray" className="flex-shrink-0">
                 {job.provider}
@@ -231,6 +242,12 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
               <Badge variant="gray" className="flex-shrink-0">
                 <Target className="w-3 h-3 mr-1" />
                 No match
+              </Badge>
+            )}
+            {job.visaSponsored === true && (
+              <Badge variant="success" className="flex-shrink-0" title="This company is confirmed to sponsor visas">
+                <ShieldCheck className="w-3 h-3 mr-1" />
+                Visa sponsorship
               </Badge>
             )}
             {savedStatus && (
@@ -318,6 +335,16 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setDetailsOpen(true)}
+              className="flex-1 sm:flex-none"
+              title="Open full details, AI assists, and similar jobs"
+            >
+              <Eye className="w-3.5 h-3.5 mr-1.5" />
+              Details
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleApplyClick}
               className="flex-1 sm:flex-none"
               disabled={!job.applyUrl}
@@ -325,6 +352,16 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
             >
               <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
               Apply
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTailorOpen(true)}
+              className="flex-1 sm:flex-none"
+              title="Tailor your resume to this job"
+            >
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              Tailor CV
             </Button>
             {defaultResumeId &&
               !savedStatus && (
@@ -409,6 +446,25 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
             </div>,
             document.body
           )}
+
+      {/* Job detail drawer — full description, AI assists, and similar jobs */}
+      {detailsOpen && (
+        <JobDetailDrawer
+          job={job}
+          defaultResumeId={defaultResumeId}
+          savedStatus={savedStatus}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
+
+      {/* Tailor CV drawer — rewrites the user's resume against this job */}
+      {tailorOpen && (
+        <TailorResumeDrawer
+          job={job}
+          defaultResumeId={defaultResumeId}
+          onClose={() => setTailorOpen(false)}
+        />
+      )}
     </>
   )
 }
