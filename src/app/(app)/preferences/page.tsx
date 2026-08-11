@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { RoleType } from '@/types'
 import { cn } from '@/lib/utils'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 import {
   Loader2, MapPin, Globe, Ban, DollarSign, X, Plus, Briefcase, Save, Sparkles,
 } from 'lucide-react'
@@ -190,6 +190,7 @@ export default function PreferencesPage() {
   const [saving, setSaving] = useState(false)
   const [locationInput, setLocationInput] = useState('')
   const [keywordInput, setKeywordInput] = useState('')
+  const { toast } = useToast()
 
   const {
     register,
@@ -227,7 +228,7 @@ export default function PreferencesPage() {
         setValue('excludedKeywords', data.preferences.excludedKeywords || [])
       }
     } catch {
-      toast.error('Failed to load preferences')
+      toast({ type: 'error', message: 'Failed to load preferences' })
     } finally {
       setIsLoading(false)
     }
@@ -250,12 +251,12 @@ export default function PreferencesPage() {
         }),
       })
       if (res.ok) {
-        toast.success('Preferences saved!')
+        toast({ type: 'success', message: 'Preferences saved!' })
       } else {
-        toast.error('Failed to save preferences')
+        toast({ type: 'error', message: 'Failed to save preferences' })
       }
     } catch {
-      toast.error('Failed to save preferences')
+      toast({ type: 'error', message: 'Failed to save preferences' })
     } finally {
       setSaving(false)
     }

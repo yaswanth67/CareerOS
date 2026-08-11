@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { downloadFile } from '@/lib/utils'
 import { AppStatus } from '@/types'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 
 // Shape-compatible with the Application objects the applications page fetches.
 interface InsightsApplication {
@@ -42,6 +42,7 @@ const FUNNEL_STAGES: { status: AppStatus; label: string; color: string }[] = [
 ]
 
 export function ApplicationInsights({ applications, visible }: ApplicationInsightsProps) {
+  const { toast } = useToast()
   const counts = useMemo(() => {
     const c: Record<AppStatus, number> = {
       SAVED: 0, APPLIED: 0, INTERVIEWING: 0, OFFER: 0, REJECTED: 0, WITHDRAWN: 0,
@@ -82,7 +83,7 @@ export function ApplicationInsights({ applications, visible }: ApplicationInsigh
 
   const handleExport = () => {
     if (!visible.length) {
-      toast.error('Nothing to export — no applications match the current filters')
+      toast({ type: 'error', message: 'Nothing to export — no applications match the current filters' })
       return
     }
     const headers = ['Company', 'Role', 'Location', 'Status', 'Applied At', 'Updated At', 'Notes', 'Apply URL']
@@ -99,7 +100,7 @@ export function ApplicationInsights({ applications, visible }: ApplicationInsigh
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n')
     downloadFile('applications.csv', csv, 'text/csv;charset=utf-8')
-    toast.success(`Exported ${visible.length} application${visible.length === 1 ? '' : 's'}`)
+    toast({ type: 'success', message: `Exported ${visible.length} application${visible.length === 1 ? '' : 's'}` })
   }
 
   return (

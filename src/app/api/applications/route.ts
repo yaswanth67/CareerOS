@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { getResumeForUser } from '@/lib/career-ops/resume-select'
 import { parseJsonArray } from '@/lib/utils'
 import { AppStatus } from '@/types'
 import { Prisma } from '@prisma/client'
@@ -54,8 +55,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { jobId, resumeId, status = 'SAVED', notes } = body
 
-    if (!jobId || !resumeId) {
-      return NextResponse.json({ error: 'Job ID and Resume ID required' }, { status: 400 })
+    if (!jobId) {
+      return NextResponse.json({ error: 'Job ID required' }, { status: 400 })
     }
 
     // Verify job exists
@@ -64,12 +65,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    // Verify resume belongs to user
-    const resume = await prisma.resume.findFirst({
-      where: { id: resumeId, userId: user.id },
-    })
+    // `resumeId` is optional: saving a job from a list (the suggestion feed,
+    // for one) has no resume picker in reach, so fall back to the user's
+    // latest resume the same way every career-ops route does. A supplied id
+    // still has to belong to the caller.
+    const resume = await getResumeForUser(user.id, resumeId)
     if (!resume) {
-      return NextResponse.json({ error: 'Resume not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Upload a resume first — applications are tracked against one.' },
+        { status: 400 }
+      )
     }
 
     const application = await prisma.application.upsert({
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
         userId_jobId: { userId: user.id, jobId },
       },
       update: {
-        resumeId,
+        resumeId: resume.id,
         status,
         notes,
         appliedAt: status === 'APPLIED' ? new Date() : undefined,
@@ -85,7 +90,7 @@ export async function POST(request: NextRequest) {
       create: {
         userId: user.id,
         jobId,
-        resumeId,
+        resumeId: resume.id,
         status,
         notes,
         appliedAt: status === 'APPLIED' ? new Date() : undefined,

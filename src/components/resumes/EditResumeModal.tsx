@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Badge } from '@/components/ui/Badge'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 import { RoleType } from '@/types'
 
 const roleOptions: { value: RoleType; label: string }[] = [
@@ -47,6 +47,7 @@ export function EditResumeModal({ resume, onClose, onSaved }: EditResumeModalPro
   const [skills, setSkills] = useState<string[]>(resume.skills)
   const [skillInput, setSkillInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
 
   const addSkill = () => {
     const s = skillInput.trim()
@@ -69,9 +70,9 @@ export function EditResumeModal({ resume, onClose, onSaved }: EditResumeModalPro
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save')
       onSaved({ id: resume.id, title: title.trim(), roleType, skills })
-      toast.success('Resume updated')
+      toast({ type: 'success', message: 'Resume updated' })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save changes')
+      toast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to save changes' })
     } finally {
       setSaving(false)
     }

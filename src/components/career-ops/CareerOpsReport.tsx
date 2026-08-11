@@ -3,9 +3,9 @@
 import { Copy } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import toast from 'react-hot-toast'
 
 // Result of a career-ops evaluation (returned by /api/career-ops/evaluate and
 // /api/jobs/[id]/career-ops). Shared by the job-detail drawer and the Evaluate
@@ -118,12 +118,13 @@ export function CareerOpsMarkdown({ markdown }: { markdown: string }) {
  * job-detail drawer and the Evaluate tab.
  */
 export function CareerOpsReport({ report }: { report: CareerOpsReportData }) {
+  const { toast } = useToast()
   const copyReport = async () => {
     try {
       await navigator.clipboard.writeText(report.markdown)
-      toast.success('Career Ops report copied')
+      toast({ type: 'success', message: 'Career Ops report copied' })
     } catch {
-      toast.error('Could not copy — select and copy manually')
+      toast({ type: 'error', message: 'Could not copy — select and copy manually' })
     }
   }
 

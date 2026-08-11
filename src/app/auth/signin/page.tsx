@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 
@@ -26,6 +26,7 @@ function SignInForm() {
 
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
   const {
     register,
@@ -49,14 +50,14 @@ function SignInForm() {
       })
 
       if (result?.error) {
-        toast.error(result.error)
+        toast({ type: 'error', message: result.error })
       } else {
-        toast.success(`Welcome back, ${data.name}!`)
+        toast({ type: 'success', message: `Welcome back, ${data.name}!` })
         router.push(callbackUrl)
         router.refresh()
       }
     } catch {
-      toast.error('Something went wrong')
+      toast({ type: 'error', message: 'Something went wrong' })
     } finally {
       setIsLoading(false)
     }

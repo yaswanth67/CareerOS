@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { batchScoreJobs } from '@/lib/ai-matcher'
 import { parseJsonArray, stringifyJsonArray } from '@/lib/utils'
 import { Prisma, type Job } from '@prisma/client'
@@ -32,12 +33,12 @@ export async function POST(request: NextRequest) {
     let jobs: Job[]
     if (jobIds?.length) {
       jobs = await prisma.job.findMany({
-        where: { id: { in: jobIds }, isActive: true },
+        where: { id: { in: jobIds }, isActive: true, ...US_ONLY_WHERE },
       })
     } else {
       // Score against all active jobs (with pagination in real app)
       jobs = await prisma.job.findMany({
-        where: { isActive: true },
+        where: { isActive: true, ...US_ONLY_WHERE },
         take: 25, // Cap for responsive heuristic scoring
         orderBy: { postedAt: 'desc' },
       })
@@ -112,6 +113,12 @@ export async function GET(request: NextRequest) {
     const where: Prisma.MatchWhereInput = {
       resume: { userId: user.id },
       score: { gte: minScore },
+      // A match outlives the job it scored, so filter on the job itself, not
+      // just on the match: a match made before the US-only gate can still point
+      // at a foreign job, and one whose job was later deactivated (dead apply
+      // link, or expired) would otherwise keep surfacing here with an "Open"
+      // button that goes nowhere.
+      job: { isActive: true, ...US_ONLY_WHERE },
     }
 
     if (resumeId) where.resumeId = resumeId

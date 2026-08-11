@@ -148,14 +148,23 @@
     text-wrap: balance;
   }
 
+  /* ============================================
+     ENTRANCE ANIMATIONS
+     ============================================ */
+
+  /* `both`, not `forwards`: with a stagger delay the element must hold the
+     0% (hidden) state *during* the delay, otherwise it flashes at full opacity
+     before animating. Doing it here rather than with an inline `opacity: 0`
+     matters — an inline style outranks the reduced-motion rule below, so a
+     staggered card would stay invisible forever for those users. */
   .animate-in {
-    animation: animateIn 0.3s ease-out forwards;
+    animation: animateIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   @keyframes animateIn {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      transform: translateY(12px);
     }
     to {
       opacity: 1;
@@ -163,14 +172,40 @@
     }
   }
 
+  /* Exit counterpart to .animate-in — used by Toast when a toast dismisses.
+     Without it the exit state rendered instantly with no transition. */
+  .animate-out {
+    animation: animateOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+
+  @keyframes animateOut {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.97);
+    }
+  }
+
+  .animate-in-fast {
+    animation: animateIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-in-slow {
+    animation: animateIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Slide animations */
   .slide-in-right {
-    animation: slideInRight 0.3s ease-out forwards;
+    animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   @keyframes slideInRight {
     from {
       opacity: 0;
-      transform: translateX(20px);
+      transform: translateX(30px);
     }
     to {
       opacity: 1;
@@ -179,7 +214,7 @@
   }
 
   .slide-out-right {
-    animation: slideOutRight 0.2s ease-in forwards;
+    animation: slideOutRight 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
   }
 
   @keyframes slideOutRight {
@@ -189,7 +224,318 @@
     }
     to {
       opacity: 0;
-      transform: translateX(20px);
+      transform: translateX(30px);
+    }
+  }
+
+  .slide-in-left {
+    animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .slide-down {
+    animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Scale animations */
+  .scale-in {
+    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .scale-out {
+    animation: scaleOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+
+  @keyframes scaleOut {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+
+  /* Fade animations */
+  .fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .fade-out {
+    animation: fadeOut 0.2s ease-in forwards;
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  /* ============================================
+     INTERACTION ANIMATIONS
+     ============================================ */
+
+  /* Shake for validation errors */
+  .animate-shake {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+  }
+
+  /* Pulse ring for loading states */
+  .animate-pulse-ring {
+    animation: pulse-ring 1.5s ease-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  /* Morphing blob for loading */
+  .animate-blob {
+    animation: blob 8s ease-in-out infinite;
+  }
+
+  @keyframes blob {
+    0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+    25% { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; }
+    50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+    75% { border-radius: 60% 40% 60% 40% / 40% 60% 60% 40%; }
+  }
+
+  /* Spin with easing */
+  .animate-spin-smooth {
+    animation: spin-smooth 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes spin-smooth {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Bounce in for success states */
+  .animate-bounce-in {
+    animation: bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  }
+
+  @keyframes bounceIn {
+    0% { opacity: 0; transform: scale(0.3); }
+    50% { opacity: 1; transform: scale(1.05); }
+    70% { transform: scale(0.95); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ============================================
+     DRAWER/MODAL ANIMATIONS
+     ============================================ */
+
+  .drawer-enter {
+    animation: drawerEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes drawerEnter {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .drawer-exit {
+    animation: drawerExit 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+
+  @keyframes drawerExit {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+
+  .backdrop-enter {
+    animation: backdropEnter 0.3s ease-out forwards;
+  }
+
+  @keyframes backdropEnter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .backdrop-exit {
+    animation: backdropExit 0.2s ease-in forwards;
+  }
+
+  @keyframes backdropExit {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  /* ============================================
+     STAGGER UTILITIES
+     ============================================ */
+
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+  .stagger-6 { animation-delay: 300ms; }
+  .stagger-7 { animation-delay: 350ms; }
+  .stagger-8 { animation-delay: 400ms; }
+
+  /* ============================================
+     HOVER/FOCUS ANIMATIONS
+     ============================================ */
+
+  .hover-lift {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.15);
+  }
+
+  .hover-scale {
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .hover-scale:hover {
+    transform: scale(1.02);
+  }
+
+  .press-scale {
+    transition: transform 0.05s linear;
+  }
+
+  .press-scale:active,
+  .press-scale[data-pressed="true"] {
+    transform: scale(0.98);
+  }
+
+  .focus-ring {
+    transition: box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .focus-ring:focus {
+    box-shadow: 0 0 0 3px rgb(var(--primary) / 0.3);
+    border-color: rgb(var(--primary));
+  }
+
+  .focus-ring-danger:focus {
+    box-shadow: 0 0 0 3px rgb(var(--destructive) / 0.3);
+    border-color: rgb(var(--destructive));
+  }
+
+  .focus-ring-success:focus {
+    box-shadow: 0 0 0 3px rgb(var(--success) / 0.3);
+    border-color: rgb(var(--success));
+  }
+
+  /* ============================================
+     REDUCED MOTION
+     ============================================ */
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-in,
+    .animate-out,
+    .animate-in-fast,
+    .animate-in-slow,
+    .slide-in-right,
+    .slide-out-right,
+    .slide-in-left,
+    .slide-up,
+    .slide-down,
+    .scale-in,
+    .scale-out,
+    .fade-in,
+    .fade-out,
+    .animate-shake,
+    .animate-pulse-ring,
+    .animate-blob,
+    .animate-spin-smooth,
+    .animate-bounce-in,
+    .drawer-enter,
+    .drawer-exit,
+    .backdrop-enter,
+    .backdrop-exit,
+    .hover-lift,
+    .hover-scale,
+    .press-scale,
+    .focus-ring,
+    .focus-ring-danger,
+    .focus-ring-success {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    .stagger-1, .stagger-2, .stagger-3, .stagger-4,
+    .stagger-5, .stagger-6, .stagger-7, .stagger-8 {
+      animation-delay: 0ms !important;
     }
   }
 }

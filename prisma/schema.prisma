@@ -56,6 +56,11 @@ model Job {
   provider        String
   title           String
   company         String
+  // Lowercase/punctuation-stripped `company`, set on every write by
+  // normalizeCompany in src/lib/job-fetcher/dedup.ts. Deduplication matches on
+  // this because SQLite compares strings case-sensitively and Prisma's
+  // `mode: 'insensitive'` is not supported on SQLite.
+  companySlug     String        @default("")
   location        String
   isRemote        Boolean       @default(false)
   description     String
@@ -73,14 +78,20 @@ model Job {
   isActive        Boolean       @default(true)
   // null = not yet classified; true = likely sponsors visas (AI/keyword detected)
   visaSponsored   Boolean?
+  // The app is US-only. Set at ingest from src/lib/geo/us-location so the
+  // filter can run in SQL — a JS post-filter would break pagination totals.
+  isUs            Boolean       @default(true)
   applications    Application[]
   matches         Match[]
 
   @@unique([externalId, provider])
+  @@index([applyUrl])
+  @@index([companySlug, isActive])
   @@index([provider, isActive])
   @@index([roleType, isActive])
   @@index([location, isActive])
   @@index([visaSponsored, isActive])
+  @@index([isUs, isActive])
 }
 
 model Match {

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { EditResumeModal, type EditableResume } from '@/components/resumes/EditResumeModal'
 import { formatDate } from '@/lib/utils'
 import { ParsedResume, RoleType } from '@/types'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 
 interface Resume {
   id: string
@@ -48,6 +48,7 @@ const roleLabels: Record<RoleType, string> = {
 
 export default function ResumesPage() {
   const { data: session } = useSession()
+  const { toast } = useToast()
   const [resumes, setResumes] = useState<Resume[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -64,7 +65,7 @@ export default function ResumesPage() {
         if (!cancelled) setResumes(data.resumes || [])
       })
       .catch(() => {
-        if (!cancelled) toast.error('Failed to load resumes')
+        if (!cancelled) toast({ type: 'error', message: 'Failed to load resumes' })
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -83,12 +84,12 @@ export default function ResumesPage() {
       const res = await fetch(`/api/resumes/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setResumes(resumes.filter(r => r.id !== id))
-        toast.success('Resume deleted')
+        toast({ type: 'success', message: 'Resume deleted' })
       } else {
-        toast.error('Failed to delete resume')
+        toast({ type: 'error', message: 'Failed to delete resume' })
       }
     } catch {
-      toast.error('Failed to delete resume')
+      toast({ type: 'error', message: 'Failed to delete resume' })
     } finally {
       setDeletingId(null)
     }
