@@ -1,15 +1,26 @@
 import { RawJob, JobProvider, JobFetchFilters } from '@/types'
 import { prisma } from '@/lib/db'
 import { greenhouseProvider } from '@/lib/job-providers/greenhouse'
+import { ashbyProvider } from '@/lib/job-providers/ashby'
 import { leverProvider } from '@/lib/job-providers/lever'
 import { wellfoundProvider } from '@/lib/job-providers/wellfound'
 import { companyDirectProvider } from '@/lib/job-providers/company-direct'
+import { remotiveProvider } from '@/lib/job-providers/remotive'
+import { remoteokProvider } from '@/lib/job-providers/remoteok'
+import { arbeitnowProvider } from '@/lib/job-providers/arbeitnow'
+import { jobicyProvider } from '@/lib/job-providers/jobicy'
+import { validateApplyUrl } from '@/lib/job-providers/base'
 
 export const providers = [
   greenhouseProvider,
+  ashbyProvider,
   leverProvider,
   wellfoundProvider,
   companyDirectProvider,
+  remotiveProvider,
+  remoteokProvider,
+  arbeitnowProvider,
+  jobicyProvider,
 ]
 
 export interface FetchResult {
@@ -17,6 +28,7 @@ export interface FetchResult {
   jobsFetched: number
   jobsNew: number
   jobsUpdated: number
+  jobsSkipped: number
   errors: string[]
 }
 
@@ -40,6 +52,7 @@ async function fetchFromProvider(
     jobsFetched: 0,
     jobsNew: 0,
     jobsUpdated: 0,
+    jobsSkipped: 0,
     errors: [],
   }
 
@@ -51,7 +64,9 @@ async function fetchFromProvider(
     for (const rawJob of rawJobs) {
       try {
         const saved = await saveJob(rawJob, provider.name)
-        if (saved.isNew) {
+        if (saved.skipped) {
+          result.jobsSkipped++
+        } else if (saved.isNew) {
           result.jobsNew++
         } else {
           result.jobsUpdated++
@@ -64,7 +79,10 @@ async function fetchFromProvider(
     result.errors.push(`Fetch failed: ${error}`)
   }
 
-  console.log(`${provider.name}: ${result.jobsFetched} fetched, ${result.jobsNew} new, ${result.jobsUpdated} updated`)
+  console.log(
+    `${provider.name}: ${result.jobsFetched} fetched, ${result.jobsNew} new, ` +
+    `${result.jobsUpdated} updated, ${result.jobsSkipped} skipped`
+  )
   return result
 }
 
@@ -72,6 +90,28 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
   // SQLite has no array type — store lists as JSON strings
   const requirements = JSON.stringify(rawJob.requirements ?? [])
   const skills = JSON.stringify(rawJob.skills ?? [])
+
+  // Guard-rail: reject jobs whose apply link is missing or fabricated so broken
+  // links never reach the feed. If an existing job's link turned invalid, we
+  // deactivate it instead of updating it with more bad data.
+  const applyUrlError = validateApplyUrl(rawJob.applyUrl)
+  if (applyUrlError) {
+    const existing = await prisma.job.findUnique({
+      where: {
+        externalId_provider: {
+          externalId: rawJob.externalId,
+          provider: provider,
+        },
+      },
+    })
+    if (existing) {
+      await prisma.job.update({
+        where: { id: existing.id },
+        data: { isActive: false },
+      })
+    }
+    return { isNew: false, job: null, skipped: true }
+  }
 
   // Check if job already exists
   const existing = await prisma.job.findUnique({
@@ -111,7 +151,7 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
         fetchedAt: new Date(),
       },
     })
-    return { isNew: false, job: similar }
+    return { isNew: false, job: similar, skipped: false }
   }
 
   if (existing) {
@@ -138,7 +178,7 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
         fetchedAt: new Date(),
       },
     })
-    return { isNew: false, job: updated }
+    return { isNew: false, job: updated, skipped: false }
   }
 
   // Create new job
@@ -164,7 +204,7 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
       isActive: true,
     },
   })
-  return { isNew: true, job: created }
+  return { isNew: true, job: created, skipped: false }
 }
 
 export async function deactivateExpiredJobs(): Promise<number> {
@@ -181,7 +221,17 @@ export async function deactivateExpiredJobs(): Promise<number> {
   return result.count
 }
 
-export async function getJobStats() {
+export async function getJobStats(country?: string) {
+  const where: { isActive: boolean; location?: { contains: string }; isRemote?: boolean } = { isActive: true }
+
+  if (country) {
+    if (country === 'Global/Remote') {
+      where.isRemote = true
+    } else {
+      where.location = { contains: country }
+    }
+  }
+
   const [
     totalJobs,
     activeJobs,
@@ -190,10 +240,11 @@ export async function getJobStats() {
     jobsByRole,
     jobsByExperience,
   ] = await Promise.all([
-    prisma.job.count(),
-    prisma.job.count({ where: { isActive: true } }),
+    prisma.job.count({ where }),
+    prisma.job.count({ where }),
     prisma.job.count({
       where: {
+        ...where,
         fetchedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
     }),

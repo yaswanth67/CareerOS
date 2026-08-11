@@ -49,6 +49,10 @@ prisma/dev.db-journal
 # stray tarballs
 *.tgz
 
+# career-ops workspace (cloned tool + its own deps/config) — repo root only.
+# Not the src/app/api/career-ops, src/components/career-ops, or src/lib/career-ops source dirs.
+/career-ops/
+
 # uploads
 public/uploads/
 
@@ -62,3 +66,5 @@ public/uploads/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+# session cookies (sensitive)
+cookies.txt

@@ -2,39 +2,77 @@ import { Suspense } from 'react'
 import { Prisma, type Job as PrismaJob } from '@prisma/client'
 import { JobCard, type Job } from './JobCard'
 import { JobSkeleton } from './JobSkeleton'
+import { LoadMoreButton } from './LoadMoreButton'
 import { prisma } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 import { parseJsonArray } from '@/lib/utils'
-import { RoleType, ExperienceLevel } from '@/types'
+import { RoleType } from '@/types'
 
 interface JobListFilters {
   q?: string
   roles?: string
-  exp?: string
   loc?: string
   remote?: string
   posted?: string
   score?: string
+  status?: string
+  country?: string
+  sponsorship?: string
+  page?: number
 }
+
+const PAGE_SIZE = 25
 
 type MatchWithResume = Prisma.MatchGetPayload<{
   include: { resume: { select: { id: true; userId: true } } }
 }>
 
-type JobWithMatches = PrismaJob & { matches: MatchWithResume[] }
+type JobWithMatches = PrismaJob & {
+  matches: MatchWithResume[]
+  applications?: { id: string; status: string }[]
+}
 
 async function getJobs(filters: JobListFilters) {
   const user = await getCurrentUser()
-  if (!user) return []
+  if (!user) return { jobs: [], resumeId: undefined }
+
+  // The user's most recent resume is used to save applications from the feed
+  const resume = await prisma.resume.findFirst({
+    where: { userId: user.id },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true },
+  })
 
   const where: Prisma.JobWhereInput = { isActive: true }
 
   const roles = filters.roles?.split(',').filter(Boolean) as RoleType[] | undefined
-  const exp = filters.exp?.split(',').filter(Boolean) as ExperienceLevel[] | undefined
+
+  // Single country from the top-bar dropdown
+  const singleCountry = filters.country
 
   if (roles?.length) where.roleType = { in: roles }
-  if (exp?.length) where.experienceLevel = { in: exp }
   if (filters.remote === '1') where.isRemote = true
+
+  // Only jobs confirmed to offer visa sponsorship (AI/keyword detected)
+  if (filters.sponsorship === '1') where.visaSponsored = true
+
+  // Single country filter (from top dropdown)
+  if (singleCountry) {
+    if (singleCountry === 'Global/Remote') {
+      where.isRemote = true
+    } else {
+      where.location = { contains: singleCountry }
+    }
+  }
+
+  // "Tracked" quick filter: only jobs the user has saved / applied to
+  if (filters.status) {
+    where.applications = { some: { userId: user.id, status: filters.status } }
+  } else {
+    // "All Jobs" — hide jobs the user has already applied to, so applied jobs
+    // don't reappear in the feed. They stay visible under the "Applied" filter.
+    where.applications = { none: { userId: user.id, status: 'APPLIED' } }
+  }
 
   const orConditions: Prisma.JobWhereInput[] = []
   if (filters.loc) {
@@ -57,17 +95,40 @@ async function getJobs(filters: JobListFilters) {
     }
   }
 
-  const jobs = (await prisma.job.findMany({
-    where,
-    orderBy: { postedAt: 'desc' },
-    take: 24,
-    include: {
-      matches: {
-        where: { resume: { userId: user.id } },
-        include: { resume: { select: { id: true, userId: true } } },
+  // Score filter — moved into SQL so the count below stays exact for pagination
+  // (a job counts when any of the user's resumes scored it >= min). Equivalent
+  // to the old JS-side "best match >= min" check.
+  if (filters.score) {
+    const min = parseInt(filters.score)
+    if (!isNaN(min) && min > 0) {
+      where.matches = { some: { resume: { userId: user.id }, score: { gte: min } } }
+    }
+  }
+
+  // Pagination: fetch `page * PAGE_SIZE` newest jobs so each "Load More" appends
+  // the next batch. Rendering every job at once (all ~11k) was so heavy the page
+  // never finished painting — only the first few cards appeared.
+  const page = Math.max(1, filters.page || 1)
+
+  const [jobs, total] = (await Promise.all([
+    prisma.job.findMany({
+      where,
+      orderBy: { postedAt: 'desc' },
+      take: page * PAGE_SIZE,
+      include: {
+        matches: {
+          where: { resume: { userId: user.id } },
+          include: { resume: { select: { id: true, userId: true } } },
+        },
+        applications: {
+          where: { userId: user.id },
+          select: { id: true, status: true },
+          take: 1,
+        },
       },
-    },
-  })) as JobWithMatches[]
+    }),
+    prisma.job.count({ where }),
+  ])) as [JobWithMatches[], number]
 
   // Add best match to each job and normalize JSON-string columns
   const jobsWithMatch = jobs.map(job => {
@@ -98,29 +159,49 @@ async function getJobs(filters: JobListFilters) {
     } as Job
   })
 
-  // Optional minimum match score filter
-  if (filters.score) {
-    const min = parseInt(filters.score)
-    if (!isNaN(min) && min > 0) {
-      return jobsWithMatch.filter(job => job.match && job.match.score >= min)
+  // Jobs come back newest-first straight from SQL — no JS re-sort needed.
+  // The score is still shown per card; it just doesn't drive the ordering.
+
+  return {
+    jobs: jobsWithMatch,
+    resumeId: resume?.id,
+    hasMore: total > jobs.length,
+    nextPage: page + 1,
+  }
+}
+
+// Build the URL for the next page of jobs, preserving every existing filter.
+function buildNextUrl(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+  page: number
+): string {
+  const params = new URLSearchParams()
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value === undefined) continue
+      if (Array.isArray(value)) value.forEach(v => params.append(key, v))
+      else params.set(key, value)
     }
   }
-
-  return jobsWithMatch
+  params.set('page', String(page))
+  return `/dashboard?${params.toString()}`
 }
 
 export async function JobList({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const filters: JobListFilters = {
     q: typeof searchParams?.q === 'string' ? searchParams.q : undefined,
     roles: typeof searchParams?.roles === 'string' ? searchParams.roles : undefined,
-    exp: typeof searchParams?.exp === 'string' ? searchParams.exp : undefined,
     loc: typeof searchParams?.loc === 'string' ? searchParams.loc : undefined,
     remote: typeof searchParams?.remote === 'string' ? searchParams.remote : undefined,
     posted: typeof searchParams?.posted === 'string' ? searchParams.posted : undefined,
     score: typeof searchParams?.score === 'string' ? searchParams.score : undefined,
+    status: typeof searchParams?.status === 'string' ? searchParams.status : undefined,
+    country: typeof searchParams?.country === 'string' ? searchParams.country : undefined,
+    sponsorship: typeof searchParams?.sponsorship === 'string' ? searchParams.sponsorship : undefined,
+    page: typeof searchParams?.page === 'string' ? parseInt(searchParams.page) || 1 : 1,
   }
 
-  const jobs = await getJobs(filters)
+  const { jobs, resumeId, hasMore, nextPage } = await getJobs(filters)
 
   if (jobs.length === 0) {
     return (
@@ -139,12 +220,19 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="flex flex-col gap-5 w-full">
       {jobs.map((job) => (
         <Suspense key={job.id} fallback={<JobSkeleton />}>
-          <JobCard job={job} />
+          <JobCard
+            job={job}
+            defaultResumeId={resumeId}
+            savedStatus={job.applications?.[0]?.status ?? null}
+          />
         </Suspense>
       ))}
+      {hasMore && (
+        <LoadMoreButton href={buildNextUrl(searchParams, nextPage)} />
+      )}
     </div>
   )
 }

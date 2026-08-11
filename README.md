@@ -1,4 +1,4 @@
-# JobMatch AI
+# MatchIQ
 
 An AI-powered job matching app that pulls live jobs from real job boards, parses your resume, and uses **AI to score how well you match each job** — with reasoning, matched skills, and missing skills.
 
@@ -10,14 +10,15 @@ Built with Next.js 16 (App Router), Prisma + SQLite, NextAuth, and the **Anthrop
 
 | # | Feature | How it works |
 |---|---------|--------------|
-| 1 | **Fetch live jobs** | Pulls real postings from **Greenhouse** public boards (Airbnb, Stripe, Coinbase, Vercel, etc.), **Lever** public postings, and best-effort **company career-page APIs** |
+| 1 | **Fetch live jobs** | Pulls real postings from **Greenhouse** (Airbnb, Stripe, Coinbase, Instacart, Lyft, Datadog, etc.), **Ashby** (OpenAI, Snowflake, Notion, ElevenLabs, …), **Lever**, direct **company career-page APIs** (Amazon), plus high-volume public job boards: **Remotive, RemoteOK, Arbeitnow, and Jobicy** — ~10k jobs per fetch |
 | 2 | **Parse resumes** | Upload a `.pdf`, `.docx`, or `.txt` resume. AI extracts skills, work experience, and education (heuristic fallback if the AI is unavailable) |
-| 3 | **AI job matching** | Pick a resume and score jobs 0–100. The AI returns a score, a written explanation, matched skills, and missing skills. Falls back to a deterministic heuristic scorer if the AI call fails |
-| 4 | **Filters** | Filter by keyword, role type, experience level, location, remote-only, **posted within (24h / 48h / 7 days)**, and minimum match score |
-| 5 | **Dashboard** | Real stats (total jobs, active, today's, strong matches) and a filterable job list |
-| 6 | **Preferences** | Target roles, locations, remote-only, visa requirement, min salary, excluded keywords |
-| 7 | **Applications** | Save jobs, track status (SAVED → APPLIED → INTERVIEWING → OFFER / REJECTED), add notes |
-| 8 | **Scheduled fetch** | `GET /api/cron/fetch-jobs` (protected by `CRON_SECRET`) re-fetches jobs idempotently and deactivates stale ones |
+| 3 | **Auto match scoring** | Jobs are scored **automatically** against your most recent resume the moment they're fetched — a fast heuristic scorer (thousands of jobs in well under a second, no LLM call) — so every card shows a match %, reasoning, and matched/missing skills with no manual step. AI scoring is available for deeper reasoning |
+| 4 | **Filters** | Filter by keyword, **company** (autocomplete), role type, experience level (**New Grad** / Senior quick chips), location, **country**, remote-only, **posted within (24h / 48h / 7 days)**, status (All Jobs / Saved / Applied), **visa sponsorship**, and minimum match score. Feed shows the **newest jobs first**, paginated with a **Load More** button to browse all of them |
+| 5 | **Visa sponsorship (AI-detected)** | Every job is classified for visa sponsorship — a keyword pre-screen catches the obvious "we do / do not sponsor" statements, and **Claude AI** reads the rest. A green **Visa sponsorship** badge appears on confirmed sponsors, and the Sponsorship filter shows only those jobs |
+| 6 | **Dashboard** | Real stats (total jobs, active jobs for the selected country, strong matches) and a full-width vertical job feed. Country + filters **persist when switching tabs** |
+| 7 | **Preferences** | Target roles, locations, remote-only, visa requirement, min salary, excluded keywords |
+| 8 | **Applications** | Save jobs, mark **Applied** (auto-tracked via the **"Have you applied?"** popup when you return from an apply link), move through the pipeline (SAVED → APPLIED → INTERVIEWING → OFFER / REJECTED), and add notes. **Applied jobs leave the All-Jobs feed** (still under the Applied filter) and can be reverted to "not applied" |
+| 9 | **Scheduled fetch** | `GET /api/cron/fetch-jobs` (protected by `CRON_SECRET`) re-fetches jobs idempotently, **auto-scores every user's jobs**, checks apply links, deactivates stale ones, and **classifies a batch of jobs for visa sponsorship** |
 
 ### How the AI connection works
 
@@ -80,7 +81,7 @@ npm run dev
 
 Sign in with the seeded account, or register your own:
 
-- **Email:** `buddy@gmail.com`
+- **Name:** `buddy`
 - **Password:** `qwerty@1`
 
 > **macOS / Linux gotcha:** if your shell exports `NODE_ENV=production` or `PORT=…`, `next dev` can misbehave. The `dev` script forces `NODE_ENV=development` and pins port `3000` so this doesn't happen. If you ever run Next directly, use `NODE_ENV=development next dev -p 3000`.
@@ -120,10 +121,11 @@ npm run start         # serve on http://localhost:3000
 |-------|-------------|
 | `/` | Landing page |
 | `/auth/signin`, `/auth/register` | Credentials auth |
-| `/dashboard` | Stats cards + filterable job list. Filters are URL-driven (`/dashboard?q=…&posted=48&remote=true`) so you can bookmark/share them |
+| `/dashboard` | Stats cards + full-width vertical job feed. Filters + country are URL-driven (`/dashboard?q=…&posted=48&country=United%20States`) so they survive tab switches and can be bookmarked/shared. Applied jobs are hidden from the feed |
 | `/resumes` | Your resumes with expandable details |
 | `/resumes/new` | Upload + AI-parse a resume (drag-and-drop) |
 | `/preferences` | Target roles, locations, remote, salary, exclusions |
+| `/applications` | Everything you've saved or applied to — change status, add notes, remove |
 
 ---
 
@@ -134,14 +136,15 @@ All routes require a logged-in session (cookie) except `/api/auth/*`.
 ### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Create account `{name, email, password}` → 201 |
+| POST | `/api/auth/register` | Create account `{name, password}` (name is unique login) → 201 |
 | POST | `/api/auth/[...nextauth]` | NextAuth (credentials sign-in) |
 
 ### Jobs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/jobs` | List jobs with filters (below) |
-| POST | `/api/jobs` | `{"action":"fetch"}` fetches from all providers; `{"action":"stats"}` returns stats |
+| GET | `/api/jobs/companies` | Distinct company names across active jobs — feeds the Company filter autocomplete |
+| POST | `/api/jobs` | `{"action":"fetch"}` fetches from all providers **and auto-scores** the new jobs against your resume (also classifies a batch for visa sponsorship); `{"action":"score"}` scores every unscored active job; `{"action":"sponsorship"}` classifies the next batch of unclassified jobs (see `npm run backfill:sponsorship` for the whole DB); `{"action":"stats"}` returns stats |
 
 **`GET /api/jobs` query params:**
 
@@ -149,9 +152,12 @@ All routes require a logged-in session (cookie) except `/api/auth/*`.
 |-------|---------|---------|
 | `page` / `pageSize` | Pagination (pageSize defaults to 20) | `?page=2&pageSize=50` |
 | `search` | Matches title, company, description, skills | `?search=react` |
+| `company` | Substring match on company name (AND with other filters) | `?company=stripe` |
+| `sponsorship` | `true` = only jobs confirmed to sponsor visas | `?sponsorship=true` |
 | `roleTypes` | Comma-separated roles | `?roleTypes=BACKEND,AI_ENGINEER` |
 | `experienceLevels` | Comma-separated levels | `?experienceLevels=ENTRY,MID` |
 | `locations` | Comma-separated locations (OR) | `?locations=San Francisco,Remote` |
+| `countries` | Comma-separated country names (or `Global/Remote`) | `?countries=United States,United Kingdom` |
 | `remoteOnly` | `true` = remote jobs only | `?remoteOnly=true` |
 | `provider` | Job source | `?provider=GREENHOUSE` |
 | `postedWithin` | **Hours** — this is the 24h/48h filter | `?postedWithin=24`, `48`, `168` |
@@ -184,7 +190,9 @@ Response shape: `{ jobs: [...], pagination: { page, pageSize, total, totalPages 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/applications` | Your applications (optional `?status=`) |
-| POST | `/api/applications` | `{jobId, resumeId, status, notes}` (upsert per user+job) |
+| POST | `/api/applications` | `{jobId, resumeId, status, notes}` (upsert per user+job; `status: 'APPLIED'` records `appliedAt`) |
+| PATCH | `/api/applications/[id]` | Change `status` / `notes` (sets `appliedAt` on first transition to APPLIED) |
+| DELETE | `/api/applications/[id]` | Remove an application (used by the card's **Not applied** button) |
 
 ### Cron
 | Method | Endpoint | Description |
@@ -207,7 +215,7 @@ You should get a `message` JSON with a `thinking` block and a `text` block. The 
 
 ### 2. Sign in
 
-Open `http://localhost:3000/auth/signin` and log in as `buddy@gmail.com` / `qwerty@1`.
+Open `http://localhost:3000/auth/signin` and log in as `buddy` / `qwerty@1`.
 
 ### 3. Trigger a live job fetch
 
@@ -279,20 +287,23 @@ jobmatch-ai/
 │   │   └── api/
 │   │       ├── auth/register      # POST register
 │   │       ├── auth/[...nextauth] # NextAuth route handler
-│   │       ├── jobs/              # GET list / POST fetch|stats
+│   │       ├── jobs/              # GET list / POST fetch|score|stats (+ countries)
 │   │       ├── matches/           # POST score / GET saved
 │   │       ├── resumes/           # GET list / POST upload-or-save
-│   │       ├── resumes/[id]/      # GET / DELETE
+│   │       ├── resumes/[id]/      # GET / PATCH / DELETE
 │   │       ├── applications/      # GET / POST
+│   │       ├── applications/[id]/ # PATCH status / DELETE
 │   │       ├── preferences/       # GET / PUT
-│   │       └── cron/fetch-jobs/   # Scheduled fetch (CRON_SECRET)
+│   │       └── cron/fetch-jobs/   # Scheduled fetch + auto-score + link check (CRON_SECRET)
 │   ├── components/
 │   │   ├── dashboard/         # JobList, JobFilters, JobCard, StatsCards, DashboardHeader, skeletons
 │   │   └── ui/                # Badge, Button, Card, Checkbox, Input, Label
 │   ├── lib/
-│   │   ├── ai-matcher/        # scoreJobAgainstResume (AI + heuristic fallback)
+│   │   ├── ai-matcher/        # batchScoreJobsHeuristic (fast auto-score) + AI scoreJob
 │   │   ├── resume-parser/     # parseResume for PDF/DOCX/TXT (AI + heuristic fallback)
 │   │   ├── job-fetcher/       # fetchAllJobs orchestration + getJobStats + saveJob (dedup)
+│   │   │   ├── auto-score.ts  # autoScoreUserJobs / autoScoreAllUsers (cron) — heuristic scoring
+│   │   │   └── link-checker.ts# HTTP-check apply links, deactivate broken ones
 │   │   ├── job-providers/     # base (shared parse + filters), greenhouse, lever, wellfound, company-direct
 │   │   ├── auth.ts            # getCurrentUser / requireAuth
 │   │   ├── auth-options.ts    # NextAuth config (kept out of route file for build)
@@ -348,15 +359,15 @@ npm run postinstall  # prisma generate
 ## Roadmap (ideas for later)
 
 - [ ] **Job detail page** (`/jobs/[id]`) — full description, salary, apply CTA
-- [ ] **Applications tracker UI** — kanban board for SAVED → APPLIED → INTERVIEWING → OFFER/REJECTED
+- [x] **Applications tracker UI** — `/applications` with status pipeline (SAVED → APPLIED → INTERVIEWING → OFFER/REJECTED), notes, and filters (a kanban board is still optional)
 - [ ] **Dedicated matches view** — browse jobs sorted by match score (API already supports `includeMatches&minScore`)
-- [ ] **Pagination / infinite scroll** on the dashboard (API supports `page`/`pageSize`)
+- [ ] **Infinite scroll** on the dashboard (currently a **Load More** button)
 - [ ] **Salary filter UI** (schema + API already have `salaryMin/Max`)
 - [ ] **More job providers** — add e.g. Workable, Ashby, or custom scrapers (extend `BaseJobProvider` and register in `src/lib/job-fetcher/index.ts`)
 - [ ] **AI resume feedback** — a prompt that suggests improvements (connection already wired)
 - [ ] **Email notifications** for new strong matches (cron endpoint already exists)
 - [ ] **Tests** — unit tests for matcher fallback + provider parsers, and e2e for the auth/fetch/matches flow
-- [ ] **Deployment configs** — Dockerfile, `vercel.json` (with `crons`), GitHub Actions workflow calling `/api/cron/fetch-jobs`
+- [ ] **Deployment configs** — Dockerfile, `vercel.json` (with `crons`) scheduling `/api/cron/fetch-jobs`
 - [ ] **Migrate SQLite → Postgres** when needed (Prisma makes this a config change + array handling)
 
 ---
