@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -83,6 +84,8 @@ export async function GET(request: NextRequest) {
     // 1. Fetch Dashboard jobs with career-ops evaluations (from Match table)
     const dashboardJobs = await prisma.job.findMany({
       where: {
+        isActive: true,
+        ...US_ONLY_WHERE,
         matches: {
           some: {
             resume: { userId: user.id },

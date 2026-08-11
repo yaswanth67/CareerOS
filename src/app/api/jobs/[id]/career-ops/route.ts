@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { runEvaluation, isCareerOpsReady } from '@/lib/career-ops'
+import { getResumeForUser } from '@/lib/career-ops/resume-select'
 
 // POST /api/jobs/[id]/career-ops — evaluate a job against the user's latest
 // resume using career-ops' Claude pipeline, driven through the app's existing
@@ -10,7 +11,7 @@ import { runEvaluation, isCareerOpsReady } from '@/lib/career-ops'
 export const runtime = 'nodejs'
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -36,10 +37,10 @@ export async function POST(
       )
     }
 
-    const resume = await prisma.resume.findFirst({
-      where: { userId: user.id },
-      orderBy: { updatedAt: 'desc' },
-    })
+    // Honour the caller's resume-version choice (the toolkit has a picker);
+    // falls back to the latest resume when none is supplied.
+    const body = await request.json().catch(() => ({}))
+    const resume = await getResumeForUser(user.id, body?.resumeId)
     if (!resume) {
       return NextResponse.json(
         { error: 'Upload a resume first — evaluations are scored against it.' },

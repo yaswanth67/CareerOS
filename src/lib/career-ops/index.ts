@@ -22,6 +22,11 @@ if (anthropicApiKey) {
   anthropic = new Anthropic({
     baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
     apiKey: anthropicApiKey,
+    // Fail fast (5 min) if the local Claude proxy is down instead of hanging
+    // for the SDK default (10 min) — a dead connection should never look like
+    // an infinite spinner in the UI. The proxy is slow (~110 output tokens/sec),
+    // so keep this well above the UI's 240s client timeout.
+    timeout: 300_000,
   })
 }
 
@@ -1321,4 +1326,242 @@ export async function runEvaluation(args: {
   }
 
   return report
+}
+
+export interface RoleSuggestion {
+  /** The market job title as actually posted, not an invented hybrid. */
+  title: string
+  /** Lateral = same work, new label · Stretch = one level up · Pivot = adjacent function. */
+  axis: 'Lateral' | 'Stretch' | 'Pivot'
+  /** 1–2 lines from cv.md quoted verbatim that back the suggestion. */
+  cvEvidence: string
+  /** What a hiring manager would question at the candidate's level; "none" for Lateral. */
+  gapNote: string
+  /** How common the title is, where it's posted, seniority skew, noise level. */
+  marketNote: string
+  /** Shortest phrase to add to portals.yml title_filter.positive to cast a wider scan. */
+  keyword: string
+}
+
+export interface SuggestRolesResult {
+  /** Structured suggestions for the UI, level-calibrated. */
+  suggestions: RoleSuggestion[]
+  /** Full human-readable output (titles.md output contract) for display/export. */
+  markdown: string
+}
+
+/**
+ * Scan the user's resume and propose adjacent job titles at their recorded level
+ * (career-ops `titles` mode), driven through the app's existing Claude connection.
+ * Hard-binds to the candidate's seniority from config/profile.yml so senior /
+ * 5+ years titles are never suggested.
+ */
+export async function suggestRoles(args: {
+  resume: CareerOpsResume
+  candidate?: CareerOpsCandidate
+}): Promise<SuggestRolesResult> {
+  const { resume, candidate = {} } = args
+
+  const ready = isCareerOpsReady()
+  if (!ready.ok) throw new Error(ready.error)
+  if (!anthropic) {
+    throw new Error('Claude connection is not configured.')
+  }
+
+  await writeCv(resume)
+  await ensureProfileYml(candidate)
+
+  // Build system prompt from career-ops titles mode (adjacent-title suggestions).
+  // Deliberately NOT loading modes/_shared.md here: that file is the A–G
+  // *evaluation* methodology, irrelevant to title suggestions, and the app's
+  // local Claude proxy has a ~150s ceiling — keeping the input small keeps a
+  // scan from hitting it. titles.md + _profile.md carry everything needed.
+  const titles = readWorkspaceFile('modes/titles.md')
+  const profileMd = readWorkspaceFile('modes/_profile.md')
+  const profileYml = readWorkspaceFile('config/profile.yml')
+  const portals = readWorkspaceFile('portals.yml')
+  const cv = `# ${resume.title}\n\n${resume.parsedText.trim()}`
+
+  const systemPrompt = `You are career-ops, an AI-powered job search assistant.
+You read the user's CV and propose adjacent job titles they aren't searching for yet, following the career-ops "titles" methodology.
+
+Your title-suggestion methodology is defined below. Follow it exactly.
+
+## Title-suggestion methodology
+${titles}
+
+## Your CV (source of truth)
+${cv}
+
+## Profile
+${profileMd}
+
+## Profile config
+${profileYml}
+
+## Current scan filter (portals.yml title_filter)
+${portals}
+
+═══════════════════════════════════════════════════════
+IMPORTANT OPERATING RULES FOR THIS SESSION
+═══════════════════════════════════════════════════════
+1. You do NOT have access to WebSearch, Playwright, or file writing tools. Base everything on the CV and profile provided.
+2. Write all human-facing output in English.
+3. LEVEL BINDING (HARD RULE): The candidate's recorded level is in "Profile config" (target_roles.archetypes[].level) and their experience in the CV. Suggest ONLY roles credible at that level. HARD EXCLUDE any title implying seniority — senior, lead, principal, staff, architect, director, head, manager — and any role whose market standard requires 5+ years of experience. If the natural title for a skill is senior-only, do NOT suggest it; use the junior/mid equivalent or skip it. A suggestion that reads as "5+ years" is a failure.
+4. Follow the titles.md output contract exactly: 5-10 suggestions, Lateral first, each with Title, Axis, CV evidence quoted VERBATIM, honest gap note, and market-reality note. Never invent evidence — every suggestion must be traceable to a quoted cv.md line.
+5. Dedup against the current scan filter: skip any candidate title an existing positive keyword already substring-matches, and never suggest anything the negative keywords exclude (deal-breakers).
+6. At the very end, output a machine-readable JSON block in this exact format (one object per suggestion, same order as the markdown). Emit it as plain text — do NOT wrap it in a markdown code fence:
+
+---SUGGESTIONS_JSON---
+[{"title":"<title>","axis":"Lateral","cvEvidence":"<verbatim quote>","gapNote":"<note>","marketNote":"<note>","keyword":"<shortest search phrase>"}]
+---END_SUGGESTIONS_JSON---`
+
+  let raw: string
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      // This model reasons heavily before writing — an uncapped thinking pass
+      // spent thousands of tokens on reasoning, leaving nothing for text (the
+      // proxy returned "(empty response)"), and 8000 max_tokens got eaten the
+      // same way. Capping the thinking budget to 1024 lets the reasoning fit
+      // comfortably and the report write in ~40s instead of timing out.
+      max_tokens: 16000,
+      temperature: TEMPERATURE,
+      // `thinking` postdates the pinned @anthropic-ai/sdk 0.21.1, so its types
+      // reject the field even though the API and the local proxy both accept
+      // it. Dropping it is not an option — it is what keeps this call from
+      // returning an empty response. Cast narrowly rather than widening the
+      // whole call, and delete the cast when the SDK is upgraded.
+      ...({ thinking: { type: 'enabled', budget_tokens: 1024 } } as object),
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content:
+          'Scan the CV above and propose adjacent job titles at the candidate\'s level. Follow the titles.md methodology and output both the full suggestions and the SUGGESTIONS_JSON block.',
+      }],
+    })
+    raw = response.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('')
+      .trim()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Claude role suggestion failed: ${message}`)
+  }
+
+  if (!raw) {
+    throw new Error('Claude returned empty role suggestions.')
+  }
+  // The local proxy substitutes "(empty response)" when its upstream doesn't
+  // finish within its ~150s window. Surface that as a retryable error instead
+  // of a plausible-looking empty report.
+  if (/^\s*\(empty response\)\s*$/i.test(raw.trim())) {
+    throw new Error(
+      'The Claude connection returned an empty response (it timed out). Try again — the scan can take 2–3 minutes.'
+    )
+  }
+
+  // The report body = the model text minus the machine-readable JSON block.
+  let markdown = raw.trim()
+  // Unwrap a single outer code fence — models sometimes wrap the entire answer.
+  if (markdown.startsWith('```') && markdown.endsWith('```')) {
+    markdown = markdown.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim()
+  }
+  // Drop the machine-readable JSON: the marker form, or a ```json fence.
+  markdown = markdown
+    .replace(/---SUGGESTIONS_JSON---[\s\S]*?---END_SUGGESTIONS_JSON---/g, '')
+    .replace(/```json\s*[\s\S]*?```/gi, '')
+    .trim()
+
+  // Prefer the machine-readable JSON when the model emitted one; otherwise fall
+  // back to deriving structured suggestions from the report's markdown, which
+  // follows a fixed per-suggestion contract (## N. Title + **Field:** lines).
+  const fromJson = parseSuggestionsJson(raw)
+  const suggestions = fromJson.length > 0 ? fromJson : parseSuggestionsFromMarkdown(markdown)
+
+  return { suggestions, markdown }
+}
+
+/**
+ * Best-effort parse of the suggestions JSON; empty array on malformed JSON.
+ * Models rarely reproduce the exact markers, so this tolerates the three
+ * realistic formats: an explicit markers block, a ```json code fence, or a
+ * bare array left at the end of the output. Each candidate is validated —
+ * the first that parses as an array of objects with `title` wins.
+ */
+function parseSuggestionsJson(raw: string): RoleSuggestion[] {
+  const candidates: string[] = []
+
+  const marked = raw.match(/---SUGGESTIONS_JSON---\s*(\[[\s\S]*?\])\s*---END_SUGGESTIONS_JSON---/)
+  if (marked) candidates.push(marked[1])
+
+  const fenced = raw.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/)
+  if (fenced) candidates.push(fenced[1])
+
+  const arrays = raw.match(/\[[\s\S]*?\]/g)
+  if (arrays) candidates.push(...arrays)
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (!Array.isArray(parsed) || parsed.length === 0) continue
+      if (parsed.some((s) => s && typeof s.title === 'string')) {
+        return parsed
+          .filter((s) => s && typeof s.title === 'string' && s.title.trim())
+          .map((s) => ({
+            title: s.title.trim(),
+            axis: ['Lateral', 'Stretch', 'Pivot'].includes(s.axis) ? s.axis : 'Lateral',
+            cvEvidence: typeof s.cvEvidence === 'string' ? s.cvEvidence : '',
+            gapNote: typeof s.gapNote === 'string' ? s.gapNote : '',
+            marketNote: typeof s.marketNote === 'string' ? s.marketNote : '',
+            keyword: typeof s.keyword === 'string' ? s.keyword.trim() : s.title.trim(),
+          }))
+      }
+    } catch {
+      // malformed candidate — keep looking
+    }
+  }
+  return []
+}
+
+/**
+ * Fallback: derive structured suggestions from the report's markdown when the
+ * model didn't emit a machine-readable JSON block. titles.md fixes the
+ * per-suggestion contract (## N. Title followed by **Field:** lines), so this
+ * is reliable even when the model skips the JSON block.
+ */
+function parseSuggestionsFromMarkdown(markdown: string): RoleSuggestion[] {
+  const suggestions: RoleSuggestion[] = []
+  // Split on each "## " heading; drop anything before the first suggestion.
+  const blocks = markdown.split(/^## /m).slice(1)
+
+  for (const block of blocks) {
+    const heading = block.split('\n', 1)[0].trim()
+    const title = heading.replace(/^\d+\.\s*/, '').trim()
+    if (!title) continue
+
+    const axisMatch = block.match(/-\s*\*\*Axis:\*\*\s*([A-Za-z]+)/i)
+    const axisRaw = axisMatch?.[1] ?? 'Lateral'
+    const cvEvidence = (block.match(/-\s*\*\*CV evidence:\*\*\s*(.+)/i)?.[1] ?? '')
+      .trim()
+      .replace(/^["']|["']$/g, '')
+    const gapNote = block.match(/-\s*\*\*Honest gap note:\*\*\s*(.+)/i)?.[1]?.trim() ?? ''
+    const marketNote = block.match(/-\s*\*\*Market-reality note:\*\*\s*(.+)/i)?.[1]?.trim() ?? ''
+    const keywordMatch = block.match(/-\s*\*\*Proposed keyword:\*\*\s*`([^`]+)`/i)
+    const keyword = keywordMatch?.[1]?.trim() || title
+
+    suggestions.push({
+      title,
+      axis: ['Lateral', 'Stretch', 'Pivot'].includes(axisRaw)
+        ? (axisRaw as RoleSuggestion['axis'])
+        : 'Lateral',
+      cvEvidence,
+      gapNote,
+      marketNote,
+      keyword,
+    })
+  }
+
+  return suggestions
 }

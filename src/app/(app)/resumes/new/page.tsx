@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Upload, FileText, X, Loader2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 import { ParsedResume, RoleType } from '@/types'
 
 type ParsedResumeData = ParsedResume & {
@@ -18,6 +18,7 @@ type ParsedResumeData = ParsedResume & {
 
 export default function ResumeUploadPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -31,7 +32,7 @@ export default function ResumeUploadPage() {
   const handleFile = (file: File | undefined) => {
     if (!file) return
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB')
+      toast({ type: 'error', message: 'File size must be less than 10MB' })
       return
     }
     setSelectedFile(file)
@@ -63,9 +64,9 @@ export default function ResumeUploadPage() {
       setEditTitle(data.resume.title || '')
       setEditRoleType(data.resume.roleType || 'SDE')
       setStep('review')
-      toast.success('Resume uploaded and parsed!')
+      toast({ type: 'success', message: 'Resume uploaded and parsed!' })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Upload failed')
+      toast({ type: 'error', message: error instanceof Error ? error.message : 'Upload failed' })
     } finally {
       setIsUploading(false)
     }
@@ -94,11 +95,11 @@ export default function ResumeUploadPage() {
         throw new Error('Failed to save resume')
       }
 
-      toast.success('Resume saved successfully!')
+      toast({ type: 'success', message: 'Resume saved successfully!' })
       router.push('/resumes')
       router.refresh()
     } catch {
-      toast.error('Failed to save resume')
+      toast({ type: 'error', message: 'Failed to save resume' })
     }
   }
 

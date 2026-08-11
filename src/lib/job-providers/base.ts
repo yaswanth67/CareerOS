@@ -1,6 +1,7 @@
 import { JobFetchFilters, RawJob, JobProvider, ExperienceLevel, RoleType } from '@/types'
 import Anthropic from '@anthropic-ai/sdk'
 import { htmlToText } from '@/lib/utils'
+import { classifyExperienceLevel } from '@/lib/job-providers/experience-level'
 
 // Guard-rail for apply links: every URL stored on a Job must look like a real,
 // job-specific posting. Fabricated fallbacks (homepage roots, careers landing
@@ -138,7 +139,11 @@ export class BaseJobProvider implements JobProviderAdapter {
       description: raw.description || raw.content || '',
       requirements: raw.requirements || [],
       skills: raw.skills || raw.tags || [],
-      experienceLevel: this.parseExperienceLevel(raw.experienceLevel || raw.seniority),
+      // Fall back to the title, exactly as roleType does on the next line —
+      // otherwise a board that sends no seniority field makes every posting MID.
+      experienceLevel: this.parseExperienceLevel(
+        raw.experienceLevel || raw.seniority || raw.title || raw.name
+      ),
       roleType: this.parseRoleType(raw.roleType || raw.category || raw.title),
       salaryMin: raw.salaryMin || raw.minSalary,
       salaryMax: raw.salaryMax || raw.maxSalary,
@@ -153,18 +158,13 @@ export class BaseJobProvider implements JobProviderAdapter {
     return job.applyUrl
   }
 
+  /**
+   * Seniority of a posting. Delegates to the standalone classifier so the
+   * backfill script can reuse it without importing a provider class — see
+   * src/lib/job-providers/experience-level.ts for the rules.
+   */
   protected parseExperienceLevel(level: string | undefined): ExperienceLevel {
-    const lower = (level || '').toLowerCase()
-    if (lower.includes('entry') || lower.includes('junior') || lower.includes('new grad') || lower.includes('0-2')) {
-      return 'ENTRY'
-    }
-    if (lower.includes('senior') || lower.includes('lead') || lower.includes('principal') || lower.includes('5+') || lower.includes('6+')) {
-      return 'SENIOR'
-    }
-    if (lower.includes('staff') || lower.includes('architect')) {
-      return 'STAFF'
-    }
-    return 'MID'
+    return classifyExperienceLevel(level)
   }
 
   protected parseRoleType(text: string | undefined): RoleType {

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { RoleType, AppStatus } from '@/types'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 
 export const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'SDE', label: 'Software Engineer' },
@@ -101,6 +101,7 @@ export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
   const [searchInput, setSearchInput] = useState(filters.q)
   const [locationInput, setLocationInput] = useState(filters.loc)
   const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
 
   const activeFiltersCount =
     filters.roles.length +
@@ -152,15 +153,15 @@ export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
 
       if (fetchRes.ok) {
         const total = (fetchData?.stats?.activeJobs ?? 0) as number
-        toast.success(`Refreshed — ${total.toLocaleString()} active jobs`)
+        toast({ type: 'success', message: `Refreshed — ${total.toLocaleString()} active jobs` })
       }
       const deactivated = (fetchData?.linkCheck?.deactivated ?? 0) as number
       if (deactivated > 0) {
-        toast.success(`Removed ${deactivated} job${deactivated === 1 ? '' : 's'} with broken links`)
+        toast({ type: 'success', message: `Removed ${deactivated} job${deactivated === 1 ? '' : 's'} with broken links` })
       }
       router.refresh()
     } catch {
-      toast.error('Failed to refresh')
+      toast({ type: 'error', message: 'Failed to refresh' })
     } finally {
       setSaving(false)
       onClose()
@@ -172,11 +173,11 @@ export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-40 bg-black/50 backdrop-enter"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed right-0 top-0 z-50 w-full max-w-md max-h-screen bg-white dark:bg-gray-900 shadow-xl slide-in-right flex flex-col">
+      <div className="fixed right-0 top-0 z-50 w-full max-w-md max-h-screen bg-white dark:bg-gray-900 shadow-xl drawer-enter flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">

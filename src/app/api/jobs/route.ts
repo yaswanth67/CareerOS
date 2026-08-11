@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { fetchAllJobs, getJobStats } from '@/lib/job-fetcher'
 import { autoScoreUserJobs } from '@/lib/job-fetcher/auto-score'
 import { classifySponsorshipForJobs } from '@/lib/job-fetcher/sponsorship'
 import { checkJobLinks } from '@/lib/job-fetcher/link-checker'
-import { parseJsonArray, extractCountry } from '@/lib/utils'
+import { parseJsonArray } from '@/lib/utils'
 import { RoleType, ExperienceLevel, JobProvider } from '@/types'
 import { Prisma, type Job } from '@prisma/client'
 
@@ -55,7 +56,9 @@ export async function GET(request: NextRequest) {
     const sponsorship = searchParams.get('sponsorship') === 'true'
 
     // Build where clause
-    const where: Prisma.JobWhereInput = { isActive: true }
+    // US-only: the app targets the US market, so the filter is not optional
+    // and cannot be widened by a query parameter.
+    const where: Prisma.JobWhereInput = { isActive: true, ...US_ONLY_WHERE }
 
     if (roleTypes?.length) where.roleType = { in: roleTypes }
     if (experienceLevels?.length) where.experienceLevel = { in: experienceLevels }
@@ -85,13 +88,16 @@ export async function GET(request: NextRequest) {
     if (company) where.company = { contains: company }
     if (sponsorship) where.visaSponsored = true
 
-    // Countries filter - extract country from location field
+    // Country filter. "United States" is every stored job, so it adds no
+    // condition — matching on `location contains "United States"` would return
+    // only the ~3% of US postings whose location string spells the country out,
+    // hiding "San Francisco, CA" and the rest.
     if (countries?.length) {
       const countryConditions: Prisma.JobWhereInput[] = []
       for (const country of countries) {
         if (country === 'Global/Remote') {
           countryConditions.push({ isRemote: true })
-        } else {
+        } else if (country !== 'United States') {
           countryConditions.push({ location: { contains: country } })
         }
       }
@@ -188,22 +194,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper to get all available countries from active jobs
+// Selectable options for the country dropdown.
+//
+// Every stored job is US-only, so this no longer enumerates countries found in
+// location strings: that ran the whole feed through extractCountry(), whose
+// two-letter map turns "Wilmington, DE" into Germany and reads Canada out of a
+// multi-site "US / Canada" posting — offering a dozen countries that all
+// returned nothing. The real choice left is US-wide vs remote-only.
 async function getAvailableCountries(): Promise<string[]> {
-  const jobs = await prisma.job.findMany({
-    where: { isActive: true },
-    select: { location: true, isRemote: true },
+  const remoteCount = await prisma.job.count({
+    where: { isActive: true, ...US_ONLY_WHERE, isRemote: true },
   })
-  const countries = new Set<string>()
-  for (const job of jobs) {
-    const country = extractCountry(job.location)
-    if (country) {
-      countries.add(country)
-    } else if (job.isRemote) {
-      countries.add('Global/Remote')
-    }
-  }
-  return Array.from(countries).sort()
+  return remoteCount > 0 ? ['United States', 'Global/Remote'] : ['United States']
 }
 
 export async function POST(request: NextRequest) {

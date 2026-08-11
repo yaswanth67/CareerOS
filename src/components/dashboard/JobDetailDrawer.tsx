@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/Button'
 import { getRoleLabel, getExperienceLabel, formatRelativeTime, downloadFile, cn, htmlToText } from '@/lib/utils'
 import type { InterviewQuestionSet } from '@/types'
 import { CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
+import { DrawerPortal } from '@/components/ui/DrawerPortal'
 
 // PENDING_APPLY_KEY must match JobCard so its "Have you applied?" portal fires
 // when the user returns from an apply link opened from this drawer.
@@ -137,6 +138,7 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
   const [evaluation, setEvaluation] = useState<CareerOpsReportData | null>(null)
   const [evaluationLoading, setEvaluationLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { toast } = useToast()
 
   const score = currentJob.match?.score || 0
   const hasMatch = !!currentJob.match
@@ -179,7 +181,7 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
 
   const handleSave = async () => {
     if (!defaultResumeId) {
-      toast.error('Upload a resume first to save jobs')
+      toast({ type: 'error', message: 'Upload a resume first to save jobs' })
       return
     }
     setSaving(true)
@@ -192,13 +194,13 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setStatus('SAVED')
-        toast.success('Job saved — track it under Applications')
+        toast({ type: 'success', message: 'Job saved — track it under Applications' })
         router.refresh()
       } else {
-        toast.error(data?.error || 'Failed to save job')
+        toast({ type: 'error', message: data?.error || 'Failed to save job' })
       }
     } catch {
-      toast.error('Failed to save job')
+      toast({ type: 'error', message: 'Failed to save job' })
     } finally {
       setSaving(false)
     }
@@ -213,10 +215,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
       if (res.ok && data.letter) {
         setLetter(data.letter)
       } else {
-        toast.error(data?.error || 'Failed to generate cover letter')
+        toast({ type: 'error', message: data?.error || 'Failed to generate cover letter' })
       }
     } catch {
-      toast.error('Failed to generate cover letter')
+      toast({ type: 'error', message: 'Failed to generate cover letter' })
     } finally {
       setLetterLoading(false)
     }
@@ -231,10 +233,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
       if (res.ok && data.email) {
         setEmail(data.email)
       } else {
-        toast.error(data?.error || 'Failed to generate cold email')
+        toast({ type: 'error', message: data?.error || 'Failed to generate cold email' })
       }
     } catch {
-      toast.error('Failed to generate cold email')
+      toast({ type: 'error', message: 'Failed to generate cold email' })
     } finally {
       setEmailLoading(false)
     }
@@ -249,10 +251,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
       if (res.ok && data.questions) {
         setQuestions(data.questions)
       } else {
-        toast.error(data?.error || 'Failed to generate interview questions')
+        toast({ type: 'error', message: data?.error || 'Failed to generate interview questions' })
       }
     } catch {
-      toast.error('Failed to generate interview questions')
+      toast({ type: 'error', message: 'Failed to generate interview questions' })
     } finally {
       setQuestionsLoading(false)
     }
@@ -267,10 +269,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
       if (res.ok && data.report) {
         setEvaluation(data.report)
       } else {
-        toast.error(data?.error || 'Failed to run career-ops evaluation')
+        toast({ type: 'error', message: data?.error || 'Failed to run career-ops evaluation' })
       }
     } catch {
-      toast.error('Failed to run career-ops evaluation')
+      toast({ type: 'error', message: 'Failed to run career-ops evaluation' })
     } finally {
       setEvaluationLoading(false)
     }
@@ -279,9 +281,9 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
   const copyText = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`${label} copied`)
+      toast({ type: 'success', message: `${label} copied` })
     } catch {
-      toast.error('Could not copy — select and copy manually')
+      toast({ type: 'error', message: 'Could not copy — select and copy manually' })
     }
   }
 
@@ -303,10 +305,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
         scrollRef.current?.scrollTo({ top: 0 })
         loadSimilar(id)
       } else {
-        toast.error(data?.error || 'Could not open that job')
+        toast({ type: 'error', message: data?.error || 'Could not open that job' })
       }
     } catch {
-      toast.error('Could not open that job')
+      toast({ type: 'error', message: 'Could not open that job' })
     } finally {
       setSimilarLoading(false)
     }
@@ -319,12 +321,16 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
     : ''
 
   return (
-    <>
+    <DrawerPortal>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div
+        className="fixed inset-0 z-50 bg-black/50 backdrop-enter backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 z-[60] w-full max-w-2xl max-h-screen bg-white dark:bg-gray-900 shadow-xl slide-in-right flex flex-col">
+      <div className="fixed right-0 top-0 z-[60] w-full max-w-2xl h-screen bg-white dark:bg-gray-900 shadow-xl drawer-enter flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -615,6 +621,6 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
           )}
         </div>
       </div>
-    </>
+    </DrawerPortal>
   )
 }

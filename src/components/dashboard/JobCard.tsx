@@ -11,7 +11,7 @@ import { formatRelativeTime, getScoreColor, getScoreLabel, getRoleLabel, getExpe
 import { RoleType, ExperienceLevel } from '@/types'
 import { JobDetailDrawer } from './JobDetailDrawer'
 import { TailorResumeDrawer } from './TailorResumeDrawer'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
   SAVED: { label: 'Saved', variant: 'gray' },
@@ -58,10 +58,13 @@ interface JobCardProps {
   defaultResumeId?: string | null
   /** Current application status for this job, if the user has saved it */
   savedStatus?: string | null
+  /** Delay in milliseconds for staggered entrance animation */
+  entranceDelay?: number
 }
 
-export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
+export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: JobCardProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   const [applying, setApplying] = useState(false)
   const [reverting, setReverting] = useState(false)
@@ -128,7 +131,7 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
 
   const handleSave = async () => {
     if (!defaultResumeId) {
-      toast.error('Upload a resume first to save jobs')
+      toast({ type: 'error', message: 'Upload a resume first to save jobs' })
       return
     }
     setSaving(true)
@@ -140,13 +143,13 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success('Job saved — track it under Applications')
+        toast({ type: 'success', message: 'Job saved — track it under Applications' })
         router.refresh()
       } else {
-        toast.error(data?.error || 'Failed to save job')
+        toast({ type: 'error', message: data?.error || 'Failed to save job' })
       }
     } catch {
-      toast.error('Failed to save job')
+      toast({ type: 'error', message: 'Failed to save job' })
     } finally {
       setSaving(false)
     }
@@ -155,7 +158,7 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
   // Mark the job as applied so it's tracked under Applications with an appliedAt date.
   const handleMarkApplied = async () => {
     if (!defaultResumeId) {
-      toast.error('Upload a resume first to track applications')
+      toast({ type: 'error', message: 'Upload a resume first to track applications' })
       return
     }
     setApplying(true)
@@ -167,14 +170,14 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success('Marked as applied — tracking under Applications')
+        toast({ type: 'success', message: 'Marked as applied — tracking under Applications' })
         clearPendingApply()
         router.refresh()
       } else {
-        toast.error(data?.error || 'Failed to mark as applied')
+        toast({ type: 'error', message: data?.error || 'Failed to mark as applied' })
       }
     } catch {
-      toast.error('Failed to mark as applied')
+      toast({ type: 'error', message: 'Failed to mark as applied' })
     } finally {
       setApplying(false)
     }
@@ -189,13 +192,13 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
       const res = await fetch(`/api/applications/${appId}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success('Marked as not applied')
+        toast({ type: 'success', message: 'Marked as not applied' })
         router.refresh()
       } else {
-        toast.error(data?.error || 'Failed to mark as not applied')
+        toast({ type: 'error', message: data?.error || 'Failed to mark as not applied' })
       }
     } catch {
-      toast.error('Failed to mark as not applied')
+      toast({ type: 'error', message: 'Failed to mark as not applied' })
     } finally {
       setReverting(false)
     }
@@ -203,7 +206,11 @@ export function JobCard({ job, defaultResumeId, savedStatus }: JobCardProps) {
 
   return (
     <>
-      <Card className="card-hover overflow-hidden">
+      <Card
+        className="card-hover overflow-hidden"
+        animated={true}
+        delay={entranceDelay || 0}
+      >
         <CardContent className="p-5">
           {/* Header — title first so the role is always visible; clicking opens the detail drawer */}
           <div className="flex items-start justify-between gap-4 mb-1">

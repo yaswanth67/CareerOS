@@ -160,16 +160,21 @@ function heuristicScore(
   // 3. Role Type Alignment (20% weight)
   const roleTypeScore = calculateRoleAlignment(resumeTextLower, job.roleType)
 
-  // 4. Experience Level Match (10% weight)
+  // 4. Experience Level Match (15% weight)
   const levelScore = calculateLevelMatch(resumeTextLower, job.experienceLevel)
 
-  // Weighted composite score
-  const finalScore = Math.round(
+  // Weighted composite. Level carries 15% (was 10%), taken from the experience
+  // keyword overlap, which is the softest of the four signals — it counts
+  // generic words like "team" and "project" appearing in both documents.
+  const weighted =
     skillScore * 0.40 +
-    experienceScore * 0.30 +
+    experienceScore * 0.25 +
     roleTypeScore * 0.20 +
-    levelScore * 0.10
-  )
+    levelScore * 0.15
+
+  // Then scale down anything above the candidate's level, so an out-of-reach
+  // posting cannot outrank a comparable one they could actually get.
+  const finalScore = Math.round(weighted * levelReachPenalty(resumeTextLower, job.experienceLevel))
 
   // Generate reasoning
   const reasoning = generateReasoning(
@@ -211,19 +216,85 @@ function calculateRoleAlignment(resumeText: string, jobRoleType: string): number
   return Math.min(100, (matches / keywords.length) * 120)
 }
 
-function calculateLevelMatch(resumeText: string, jobLevel: string): number {
-  const levelIndicators: Record<string, string[]> = {
-    ENTRY: ['intern', 'junior', 'entry', 'graduate', 'new grad', '0-2', 'learning'],
-    MID: ['mid', 'intermediate', '2-5', '3-5', 'experienced', 'independent'],
-    SENIOR: ['senior', 'lead', '5+', '6+', '7+', 'architect', 'mentor', 'principal'],
-    STAFF: ['staff', 'principal', 'architect', 'distinguished', 'fellow', '10+'],
+/** Seniority ladder, low to high. Index doubles as the level's rank. */
+const LEVEL_ORDER = ['ENTRY', 'MID', 'SENIOR', 'STAFF'] as const
+
+/**
+ * The candidate's own level, read from their resume.
+ *
+ * Years of experience win when the resume states them, since that is the thing
+ * postings actually gate on. Otherwise a held title ("Senior Engineer") is the
+ * next best signal. A resume that says neither is treated as MID rather than
+ * ENTRY: guessing low would bury every mid-level role, and guessing high would
+ * reintroduce exactly the problem this scoring exists to prevent.
+ */
+export function inferCandidateLevel(resumeText: string): (typeof LEVEL_ORDER)[number] {
+  const text = resumeText.toLowerCase()
+
+  const years = [...text.matchAll(/(\d{1,2})\s*\+?\s*(?:years?|yrs?)\b/g)]
+    .map(m => parseInt(m[1], 10))
+    .filter(n => Number.isFinite(n) && n <= 40)
+  const maxYears = years.length ? Math.max(...years) : null
+
+  if (maxYears !== null) {
+    if (maxYears >= 10) return 'STAFF'
+    if (maxYears >= 5) return 'SENIOR'
+    if (maxYears >= 2) return 'MID'
+    return 'ENTRY'
   }
 
-  const indicators = levelIndicators[jobLevel] || []
-  if (indicators.length === 0) return 50
+  if (/\b(staff|principal|distinguished|fellow|head of|director|vp)\b/.test(text)) return 'STAFF'
+  if (/\b(senior|sr\.?)\b/.test(text) || /\blead\b/.test(text)) return 'SENIOR'
+  if (/\b(intern|internship|junior|jr\.?|new grad|graduate|entry[- ]?level)\b/.test(text)) {
+    return 'ENTRY'
+  }
 
-  const matches = indicators.filter(ind => resumeText.includes(ind.toLowerCase())).length
-  return Math.min(100, (matches / indicators.length) * 100 + 30)
+  return 'MID'
+}
+
+/**
+ * How well a posting's seniority suits the candidate, 0–100.
+ *
+ * This used to check whether the *resume* contained the *job level's* own
+ * keywords — so a senior posting scored well for anyone whose resume happened
+ * to say "lead" or "mentor", and the candidate's actual level was never
+ * considered at all. Now it compares the two levels directly.
+ *
+ * Reaching one level up is a stretch worth showing; two or more up is a role
+ * the candidate will not be considered for. Roles below the candidate stay
+ * respectable — they can do the work — but rank under an exact fit.
+ */
+function calculateLevelMatch(resumeText: string, jobLevel: string): number {
+  const candidate = inferCandidateLevel(resumeText)
+  const jobIndex = LEVEL_ORDER.indexOf(jobLevel as (typeof LEVEL_ORDER)[number])
+  if (jobIndex === -1) return 50
+
+  const distance = jobIndex - LEVEL_ORDER.indexOf(candidate)
+  if (distance === 0) return 100
+  if (distance === 1) return 55
+  if (distance >= 2) return 10
+  if (distance === -1) return 70
+  return 45
+}
+
+/**
+ * Multiplier applied to the composite score for a posting above the
+ * candidate's level.
+ *
+ * Weighting alone is not enough: level is one term among four, so a staff role
+ * with strong skill overlap still outscored an exact-level role with slightly
+ * weaker overlap — which is how a junior candidate's "best matches" filled up
+ * with Staff and Senior titles. Scaling the whole score keeps an over-leveled
+ * posting visible while making it lose to a comparable role at the right level.
+ */
+function levelReachPenalty(resumeText: string, jobLevel: string): number {
+  const jobIndex = LEVEL_ORDER.indexOf(jobLevel as (typeof LEVEL_ORDER)[number])
+  if (jobIndex === -1) return 1
+  const distance = jobIndex - LEVEL_ORDER.indexOf(inferCandidateLevel(resumeText))
+  if (distance <= 0) return 1
+  if (distance === 1) return 0.9
+  if (distance === 2) return 0.75
+  return 0.6
 }
 
 function generateReasoning(
@@ -240,7 +311,14 @@ function generateReasoning(
 
   let reasoning = `Skill match: ${matchedCount}/${totalSkills} (${skillPct}%) required skills. `
   reasoning += `Role alignment with ${roleLabel}: ${roleScore > 60 ? 'strong' : roleScore > 30 ? 'moderate' : 'weak'}. `
-  reasoning += `Experience level (${levelLabel}) match: ${levelScore > 60 ? 'good' : levelScore > 30 ? 'partial' : 'limited'}.`
+
+  // Name the seniority gap explicitly — it now moves the ranking, so the card
+  // should say why an otherwise strong match sits lower.
+  if (levelScore >= 100) reasoning += `Seniority (${levelLabel}): matches your level.`
+  else if (levelScore >= 70) reasoning += `Seniority (${levelLabel}): below your level.`
+  else if (levelScore >= 55) reasoning += `Seniority (${levelLabel}): one level up — a stretch.`
+  else if (levelScore <= 10) reasoning += `Seniority (${levelLabel}): well above your level.`
+  else reasoning += `Seniority (${levelLabel}): partial match.`
 
   return reasoning
 }
