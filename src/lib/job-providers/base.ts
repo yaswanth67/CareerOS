@@ -1,5 +1,58 @@
 import { JobFetchFilters, RawJob, JobProvider, ExperienceLevel, RoleType } from '@/types'
 import Anthropic from '@anthropic-ai/sdk'
+import { htmlToText } from '@/lib/utils'
+
+// Guard-rail for apply links: every URL stored on a Job must look like a real,
+// job-specific posting. Fabricated fallbacks (homepage roots, careers landing
+// pages, placeholder ids) are rejected here so they never reach the feed, and
+// the link-checker uses the same helper to flag stale rows already in the DB.
+//
+// Returns a short reason string when the URL should be rejected, or null when
+// it is acceptable.
+export function validateApplyUrl(url: string): string | null {
+  const trimmed = (url || '').trim()
+  if (!trimmed) return 'missing'
+  if (trimmed.length > 2048) return 'too long'
+  // Placeholder / broken-format signals.
+  if (/[\s<>{}\[\]"']|undefined|null|\bNaN\b/i.test(trimmed)) return 'placeholder'
+
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return 'not a valid URL'
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return 'unsupported protocol'
+
+  const segments = parsed.pathname.replace(/\/+/g, '/').split('/').filter(Boolean)
+  if (segments.length === 0) return 'homepage root'
+
+  const tail = segments[segments.length - 1].toLowerCase()
+  // A short bare numeric id at the end (e.g. /jobs/123, /careers/456) is a
+  // placeholder — real postings carry a descriptive slug or a longer id.
+  if (/^\d{1,6}$/.test(tail)) return 'placeholder id'
+
+  // Landing pages that are not a specific posting.
+  if (
+    segments.length === 1 &&
+    ['jobs', 'job', 'careers', 'career', 'apply', 'about', 'c', 'search', 'positions', 'openings', 'roles'].includes(
+      segments[0].toLowerCase()
+    )
+  ) {
+    return 'landing page'
+  }
+  if (segments.length === 2) {
+    const [a, b] = segments.map(s => s.toLowerCase())
+    if (
+      (a === 'careers' || a === 'about' || a === 'company' || a === 'jobs') &&
+      ['jobs', 'roles', 'careers', 'positions', 'openings'].includes(b)
+    ) {
+      return 'landing page'
+    }
+  }
+
+  return null
+}
 
 // Initialize Anthropic client only if an API key/token is available.
 // ANTHROPIC_AUTH_TOKEN is used when talking to a local Claude Code connection.
@@ -155,6 +208,14 @@ export class BaseJobProvider implements JobProviderAdapter {
     }
 
     return 'SDE'
+  }
+
+  // Strip HTML/entities from a provider's description. Keeps paragraph breaks
+  // and list bullets (htmlToText) so the stored description reads like a real
+  // posting instead of one run-on line — which also lets extractRequirements
+  // find the bulleted requirement lists below.
+  protected stripHtml(html: string): string {
+    return htmlToText(html)
   }
 
   protected extractRequirements(content: string): string[] {

@@ -8,32 +8,32 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        name: { label: 'Name', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password required')
+        if (!credentials?.name || !credentials?.password) {
+          throw new Error('Name and password required')
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { name: credentials.name },
         })
 
         if (!user) {
-          throw new Error('Invalid email or password')
+          throw new Error('Invalid name or password')
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.passwordHash)
 
         if (!isValid) {
-          throw new Error('Invalid email or password')
+          throw new Error('Invalid name or password')
         }
 
         return {
           id: user.id,
-          email: user.email,
           name: user.name,
+          email: user.email,
         }
       },
     }),
@@ -43,6 +43,17 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
+  },
+  cookies: {
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
   },
   callbacks: {
     async jwt({ token, user }) {

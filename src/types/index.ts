@@ -20,7 +20,17 @@ export type RoleType =
   | 'PM'
   | 'OTHER'
 
-export type JobProvider = 'GREENHOUSE' | 'LEVER' | 'COMPANY_DIRECT' | 'WELLFOUND' | 'OTHER'
+export type JobProvider =
+  | 'GREENHOUSE'
+  | 'ASHBY'
+  | 'LEVER'
+  | 'COMPANY_DIRECT'
+  | 'WELLFOUND'
+  | 'REMOTIVE'
+  | 'REMOTEOK'
+  | 'ARBEITNOW'
+  | 'JOBICY'
+  | 'OTHER'
 
 export type ExperienceLevel = 'ENTRY' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'
 
@@ -65,6 +75,8 @@ export interface RawJob {
   applyUrl: string
   postedAt: Date
   expiresAt?: Date
+  /** null/undefined = not yet classified */
+  visaSponsored?: boolean | null
 }
 
 export interface ParsedJob extends RawJob {
@@ -77,6 +89,23 @@ export interface MatchResult {
   matchedSkills: string[]
   missingSkills: string[]
   recommendation: 'STRONG_MATCH' | 'GOOD_MATCH' | 'WEAK_MATCH' | 'NO_MATCH'
+}
+
+// Grouped interview-prep questions, shared between the AI generator and its
+// offline fallback so the UI renders one shape regardless of the source.
+export interface InterviewQuestion {
+  question: string
+  /** Why the interviewer likely cares / what a strong answer shows. */
+  why?: string
+}
+
+export interface InterviewQuestionGroup {
+  category: string
+  questions: InterviewQuestion[]
+}
+
+export interface InterviewQuestionSet {
+  groups: InterviewQuestionGroup[]
 }
 
 export interface JobFetchFilters {

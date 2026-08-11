@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchAllJobs, deactivateExpiredJobs, getJobStats } from '@/lib/job-fetcher'
+import { checkJobLinks } from '@/lib/job-fetcher/link-checker'
+import { autoScoreAllUsers } from '@/lib/job-fetcher/auto-score'
+import { classifySponsorshipForJobs } from '@/lib/job-fetcher/sponsorship'
 
 // This endpoint should be called by a cron service (e.g., Vercel Cron, GitHub Actions, etc.)
-// It fetches jobs from all providers and deactivates expired ones
+// It fetches jobs from all providers, deactivates expired ones, and runs the
+// apply-link guard-rail so broken links are removed automatically.
 
 export async function GET(request: NextRequest) {
   // Verify the cron secret to prevent unauthorized access
@@ -22,12 +26,27 @@ export async function GET(request: NextRequest) {
     // Deactivate expired jobs
     const deactivatedCount = await deactivateExpiredJobs()
 
+    // Guard-rail: deactivate jobs whose apply links are broken/fabricated
+    const linkCheck = await checkJobLinks({ deactivate: true })
+
+    // Auto-score jobs for every user with a resume so scores stay fresh
+    const scoredByUser = await autoScoreAllUsers()
+    const totalScored = scoredByUser.reduce((sum, u) => sum + u.scored, 0)
+
+    // Classify a batch of unclassified jobs for visa sponsorship (keyword + AI).
+    // The per-run cap keeps the cron fast; scripts/backfill-sponsorship.ts covers
+    // the full backlog locally.
+    const sponsorshipClassified = await classifySponsorshipForJobs({ limit: 50 })
+
     // Get updated stats
     const stats = await getJobStats()
 
     console.log('Scheduled job fetch completed:', {
-      results: results.map(r => ({ provider: r.provider, jobsFetched: r.jobsFetched, jobsNew: r.jobsNew, jobsUpdated: r.jobsUpdated })),
+      results: results.map(r => ({ provider: r.provider, jobsFetched: r.jobsFetched, jobsNew: r.jobsNew, jobsUpdated: r.jobsUpdated, jobsSkipped: r.jobsSkipped })),
       deactivatedCount,
+      linkCheck: { checked: linkCheck.checked, broken: linkCheck.broken, deactivated: linkCheck.deactivated },
+      jobsScored: totalScored,
+      sponsorshipClassified,
       stats,
     })
 
@@ -35,6 +54,9 @@ export async function GET(request: NextRequest) {
       success: true,
       results,
       deactivatedCount,
+      linkCheck: { checked: linkCheck.checked, broken: linkCheck.broken, deactivated: linkCheck.deactivated },
+      jobsScored: totalScored,
+      sponsorshipClassified,
       stats,
       timestamp: new Date().toISOString(),
     })

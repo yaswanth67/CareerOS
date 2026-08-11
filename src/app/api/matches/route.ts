@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       // Score against all active jobs (with pagination in real app)
       jobs = await prisma.job.findMany({
         where: { isActive: true },
-        take: 100, // Limit for demo
+        take: 25, // Cap for responsive heuristic scoring
         orderBy: { postedAt: 'desc' },
       })
     }
