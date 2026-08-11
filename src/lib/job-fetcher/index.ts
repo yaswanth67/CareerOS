@@ -10,6 +10,8 @@ import { remoteokProvider } from '@/lib/job-providers/remoteok'
 import { arbeitnowProvider } from '@/lib/job-providers/arbeitnow'
 import { jobicyProvider } from '@/lib/job-providers/jobicy'
 import { validateApplyUrl } from '@/lib/job-providers/base'
+import { findDuplicateJob, normalizeCompany } from '@/lib/job-fetcher/dedup'
+import { isUsJob, US_ONLY_WHERE } from '@/lib/geo/us-location'
 
 export const providers = [
   greenhouseProvider,
@@ -29,6 +31,8 @@ export interface FetchResult {
   jobsNew: number
   jobsUpdated: number
   jobsSkipped: number
+  /** Rejected by the US-only gate — reported separately from broken links. */
+  jobsSkippedNonUs: number
   errors: string[]
 }
 
@@ -53,6 +57,7 @@ async function fetchFromProvider(
     jobsNew: 0,
     jobsUpdated: 0,
     jobsSkipped: 0,
+    jobsSkippedNonUs: 0,
     errors: [],
   }
 
@@ -64,7 +69,9 @@ async function fetchFromProvider(
     for (const rawJob of rawJobs) {
       try {
         const saved = await saveJob(rawJob, provider.name)
-        if (saved.skipped) {
+        if (saved.skippedNonUs) {
+          result.jobsSkippedNonUs++
+        } else if (saved.skipped) {
           result.jobsSkipped++
         } else if (saved.isNew) {
           result.jobsNew++
@@ -81,7 +88,8 @@ async function fetchFromProvider(
 
   console.log(
     `${provider.name}: ${result.jobsFetched} fetched, ${result.jobsNew} new, ` +
-    `${result.jobsUpdated} updated, ${result.jobsSkipped} skipped`
+    `${result.jobsUpdated} updated, ${result.jobsSkipped} skipped, ` +
+    `${result.jobsSkippedNonUs} non-US`
   )
   return result
 }
@@ -90,6 +98,26 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
   // SQLite has no array type — store lists as JSON strings
   const requirements = JSON.stringify(rawJob.requirements ?? [])
   const skills = JSON.stringify(rawJob.skills ?? [])
+
+  // US-only gate: this app targets the US market, so a non-US posting never
+  // enters the database. A job already stored whose location has since moved
+  // abroad is deactivated rather than refreshed with data we would not show.
+  // Jobs whose location names no country at all are rejected too — see
+  // isUsJob's `allowUnknown` note.
+  if (!isUsJob({ location: rawJob.location, title: rawJob.title, provider })) {
+    const existing = await prisma.job.findUnique({
+      where: {
+        externalId_provider: { externalId: rawJob.externalId, provider: provider },
+      },
+    })
+    if (existing?.isActive) {
+      await prisma.job.update({
+        where: { id: existing.id },
+        data: { isActive: false, isUs: false },
+      })
+    }
+    return { isNew: false, job: null, skipped: true, skippedNonUs: true }
+  }
 
   // Guard-rail: reject jobs whose apply link is missing or fabricated so broken
   // links never reach the feed. If an existing job's link turned invalid, we
@@ -110,7 +138,7 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
         data: { isActive: false },
       })
     }
-    return { isNew: false, job: null, skipped: true }
+    return { isNew: false, job: null, skipped: true, skippedNonUs: false }
   }
 
   // Check if job already exists
@@ -123,19 +151,32 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
     },
   })
 
-  // Deduplication: check for similar jobs by title + company + location
-  const similar = await prisma.job.findFirst({
-    where: {
-      title: rawJob.title,
-      company: rawJob.company,
-      location: rawJob.location,
-      isActive: true,
-      NOT: existing ? { id: existing.id } : undefined,
-    },
+  // Deduplication: same apply link, or same company (case-insensitively) +
+  // title + location. See src/lib/job-fetcher/dedup.ts.
+  const similar = await findDuplicateJob({
+    title: rawJob.title,
+    company: rawJob.company,
+    location: rawJob.location,
+    applyUrl: rawJob.applyUrl,
+    excludeId: existing?.id,
   })
 
-  if (similar) {
-    // Update existing similar job with latest info
+  // When this posting already has its own row (matched on the provider's stable
+  // externalId) *and* a separate row looks like the same posting, that second
+  // row is the duplicate — retire it rather than refreshing it and leaving two
+  // active rows for one job. The externalId-keyed row wins because it is the
+  // row for this exact posting, where `similar` is only a heuristic match.
+  // Deactivating keeps the record intact for any Application/Match pointing at it.
+  if (similar && existing) {
+    await prisma.job.update({
+      where: { id: similar.id },
+      data: { isActive: false },
+    })
+  } else if (similar) {
+    // Same posting reached under a different externalId/provider — fold this
+    // fetch into the row that already exists instead of adding a second one.
+    // Title/company/location are left as stored: they are the identity we
+    // matched on, and the incoming spelling is not more authoritative.
     await prisma.job.update({
       where: { id: similar.id },
       data: {
@@ -148,10 +189,11 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
         salaryMax: rawJob.salaryMax,
         applyUrl: rawJob.applyUrl,
         expiresAt: rawJob.expiresAt,
+        isUs: true,
         fetchedAt: new Date(),
       },
     })
-    return { isNew: false, job: similar, skipped: false }
+    return { isNew: false, job: similar, skipped: false, skippedNonUs: false }
   }
 
   if (existing) {
@@ -161,6 +203,7 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
       data: {
         title: rawJob.title,
         company: rawJob.company,
+        companySlug: normalizeCompany(rawJob.company),
         location: rawJob.location,
         isRemote: rawJob.isRemote,
         description: rawJob.description,
@@ -175,10 +218,11 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
         postedAt: rawJob.postedAt,
         expiresAt: rawJob.expiresAt,
         isActive: true,
+        isUs: true,
         fetchedAt: new Date(),
       },
     })
-    return { isNew: false, job: updated, skipped: false }
+    return { isNew: false, job: updated, skipped: false, skippedNonUs: false }
   }
 
   // Create new job
@@ -188,6 +232,7 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
       provider: provider,
       title: rawJob.title,
       company: rawJob.company,
+      companySlug: normalizeCompany(rawJob.company),
       location: rawJob.location,
       isRemote: rawJob.isRemote,
       description: rawJob.description,
@@ -202,9 +247,10 @@ async function saveJob(rawJob: RawJob, provider: JobProvider) {
       postedAt: rawJob.postedAt,
       expiresAt: rawJob.expiresAt,
       isActive: true,
+      isUs: true,
     },
   })
-  return { isNew: true, job: created, skipped: false }
+  return { isNew: true, job: created, skipped: false, skippedNonUs: false }
 }
 
 export async function deactivateExpiredJobs(): Promise<number> {
@@ -222,7 +268,12 @@ export async function deactivateExpiredJobs(): Promise<number> {
 }
 
 export async function getJobStats(country?: string) {
-  const where: { isActive: boolean; location?: { contains: string }; isRemote?: boolean } = { isActive: true }
+  const where: {
+    isActive: boolean
+    isUs?: boolean
+    location?: { contains: string }
+    isRemote?: boolean
+  } = { isActive: true, ...US_ONLY_WHERE }
 
   if (country) {
     if (country === 'Global/Remote') {

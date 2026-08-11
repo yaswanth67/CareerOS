@@ -4,6 +4,7 @@ import { JobCard, type Job } from './JobCard'
 import { JobSkeleton } from './JobSkeleton'
 import { LoadMoreButton } from './LoadMoreButton'
 import { prisma } from '@/lib/db'
+import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { getCurrentUser } from '@/lib/auth'
 import { parseJsonArray } from '@/lib/utils'
 import { RoleType } from '@/types'
@@ -43,7 +44,8 @@ async function getJobs(filters: JobListFilters) {
     select: { id: true },
   })
 
-  const where: Prisma.JobWhereInput = { isActive: true }
+  // US-only — see src/lib/geo/us-location. Not user-adjustable.
+  const where: Prisma.JobWhereInput = { isActive: true, ...US_ONLY_WHERE }
 
   const roles = filters.roles?.split(',').filter(Boolean) as RoleType[] | undefined
 
@@ -56,11 +58,14 @@ async function getJobs(filters: JobListFilters) {
   // Only jobs confirmed to offer visa sponsorship (AI/keyword detected)
   if (filters.sponsorship === '1') where.visaSponsored = true
 
-  // Single country filter (from top dropdown)
+  // Single country filter (from top dropdown). "United States" is every stored
+  // job, so it adds no condition — filtering on the literal string would drop
+  // every "San Francisco, CA" posting and leave only the few that spell the
+  // country out.
   if (singleCountry) {
     if (singleCountry === 'Global/Remote') {
       where.isRemote = true
-    } else {
+    } else if (singleCountry !== 'United States') {
       where.location = { contains: singleCountry }
     }
   }
@@ -205,14 +210,14 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
 
   if (jobs.length === 0) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-12 animate-in">
         <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
           <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">No jobs found</h3>
-        <p className="mt-1 text-gray-500 dark:text-gray-400">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white animate-in" style={{ animationDelay: '100ms' }}>No jobs found</h3>
+        <p className="mt-1 text-gray-500 dark:text-gray-400 animate-in" style={{ animationDelay: '200ms' }}>
           Try adjusting your filters or refresh to fetch new jobs
         </p>
       </div>
@@ -221,12 +226,13 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
 
   return (
     <div className="flex flex-col gap-5 w-full">
-      {jobs.map((job) => (
+      {jobs.map((job, index) => (
         <Suspense key={job.id} fallback={<JobSkeleton />}>
           <JobCard
             job={job}
             defaultResumeId={resumeId}
             savedStatus={job.applications?.[0]?.status ?? null}
+            entranceDelay={index * 50}
           />
         </Suspense>
       ))}

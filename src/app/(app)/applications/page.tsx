@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
-  Briefcase, MapPin, ExternalLink, Trash2, Loader2, CheckCircle2, Clock, Inbox, Search,
+  Briefcase, MapPin, ExternalLink, Trash2, Loader2, CheckCircle2, Clock, Inbox, Search, Wrench,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -13,7 +13,8 @@ import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { AppStatus } from '@/types'
 import { ApplicationInsights } from '@/components/dashboard/ApplicationInsights'
-import toast from 'react-hot-toast'
+import { CareerOpsToolkit, type ToolkitJob } from '@/components/career-ops/CareerOpsToolkit'
+import { useToast } from '@/components/ui/Toast'
 
 const STATUS_META: Record<AppStatus, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
   SAVED: { label: 'Saved', variant: 'gray' },
@@ -41,18 +42,24 @@ interface Application {
     isRemote: boolean
     applyUrl: string
     provider: string
+    // The API returns the whole Job row, so the posting text is already here.
+    description?: string | null
   }
   resume: { id: string; title: string; roleType: string } | null
 }
 
 export default function ApplicationsPage() {
   const { data: session } = useSession()
+  const { toast } = useToast()
   const [applications, setApplications] = useState<Application[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<AppStatus | 'ALL'>('ALL')
   const [position, setPosition] = useState('')
   const [location, setLocation] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Which saved job has the career-ops toolkit open.
+  const [toolkitJob, setToolkitJob] = useState<ToolkitJob | null>(null)
+  const [toolkitResumeId, setToolkitResumeId] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (!session) return
@@ -64,7 +71,7 @@ export default function ApplicationsPage() {
         if (!cancelled) setApplications(data.applications || [])
       })
       .catch(() => {
-        if (!cancelled) toast.error('Failed to load applications')
+        if (!cancelled) toast({ type: 'error', message: 'Failed to load applications' })
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -85,12 +92,12 @@ export default function ApplicationsPage() {
       })
       if (res.ok) {
         setApplications(applications.map(a => (a.id === app.id ? { ...a, status } : a)))
-        toast.success(status === 'APPLIED' ? 'Marked as applied!' : `Status updated to ${STATUS_META[status].label}`)
+        toast({ type: 'success', message: status === 'APPLIED' ? 'Marked as applied!' : `Status updated to ${STATUS_META[status].label}` })
       } else {
-        toast.error('Failed to update status')
+        toast({ type: 'error', message: 'Failed to update status' })
       }
     } catch {
-      toast.error('Failed to update status')
+      toast({ type: 'error', message: 'Failed to update status' })
     } finally {
       setBusyId(null)
     }
@@ -103,12 +110,12 @@ export default function ApplicationsPage() {
       const res = await fetch(`/api/applications/${app.id}`, { method: 'DELETE' })
       if (res.ok) {
         setApplications(applications.filter(a => a.id !== app.id))
-        toast.success('Application removed')
+        toast({ type: 'success', message: 'Application removed' })
       } else {
-        toast.error('Failed to remove application')
+        toast({ type: 'error', message: 'Failed to remove application' })
       }
     } catch {
-      toast.error('Failed to remove application')
+      toast({ type: 'error', message: 'Failed to remove application' })
     } finally {
       setBusyId(null)
     }
@@ -287,6 +294,18 @@ export default function ApplicationsPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => {
+                        setToolkitJob(app.job)
+                        setToolkitResumeId(app.resume?.id)
+                      }}
+                      title="Tailor CV, cover letter, emails, interview prep and more for this job"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      Toolkit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => window.open(app.job.applyUrl, '_blank', 'noopener,noreferrer')}
                       disabled={!app.job.applyUrl}
                       title={app.job.applyUrl ? 'Open application page' : 'No application link available'}
@@ -314,6 +333,15 @@ export default function ApplicationsPage() {
             )
           })}
         </div>
+      )}
+
+      {/* Every career-ops capability for the selected saved job. */}
+      {toolkitJob && (
+        <CareerOpsToolkit
+          job={toolkitJob}
+          defaultResumeId={toolkitResumeId}
+          onClose={() => setToolkitJob(null)}
+        />
       )}
     </div>
   )

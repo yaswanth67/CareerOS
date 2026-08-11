@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Copy, FileText, Loader2, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, Copy, Download, FileText, Loader2, RefreshCw, X } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
+import { downloadFile } from '@/lib/utils'
+import { DrawerPortal } from '@/components/ui/DrawerPortal'
 
 interface TailorJob {
   id: string
@@ -35,6 +37,7 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
   const [result, setResult] = useState<TailorResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const generate = useCallback(async () => {
     setLoading(true)
@@ -49,7 +52,7 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.resume?.markdown) {
         setResult(data.resume)
-        toast.success('Resume tailored to this job!')
+        toast({ type: 'success', message: 'Resume tailored to this job!' })
       } else {
         setError(data?.error || 'Failed to tailor resume')
       }
@@ -71,19 +74,39 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
     if (!result) return
     try {
       await navigator.clipboard.writeText(result.markdown)
-      toast.success('Tailored CV copied')
+      toast({ type: 'success', message: 'Tailored CV copied' })
     } catch {
-      toast.error('Could not copy — select and copy manually')
+      toast({ type: 'error', message: 'Could not copy — select and copy manually' })
     }
   }
 
+  /**
+   * Save the tailored CV as a markdown file. Named after the company and role
+   * so a folder of these stays sortable — tailoring for several jobs otherwise
+   * produces a pile of identically named downloads.
+   */
+  const downloadTailored = () => {
+    if (!result) return
+    const stem = `cv-${job.company}-${job.title}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80)
+    downloadFile(`${stem}.md`, result.markdown, 'text/markdown')
+    toast({ type: 'success', message: 'Tailored CV downloaded' })
+  }
+
   return (
-    <>
+    <DrawerPortal>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div
+        className="fixed inset-0 z-50 bg-black/50 backdrop-enter backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 z-[60] w-full max-w-2xl max-h-screen bg-white dark:bg-gray-900 shadow-xl slide-in-right flex flex-col">
+      <div className="fixed right-0 top-0 z-[60] w-full max-w-2xl h-screen bg-white dark:bg-gray-900 shadow-xl drawer-enter flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -145,6 +168,9 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
                   <Button variant="ghost" size="sm" onClick={copyTailored}>
                     <Copy className="w-3.5 h-3.5 mr-1" /> Copy
                   </Button>
+                  <Button variant="ghost" size="sm" onClick={downloadTailored}>
+                    <Download className="w-3.5 h-3.5 mr-1" /> Download
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={generate} disabled={loading}>
                     <RefreshCw className="w-3.5 h-3.5 mr-1" /> Regenerate
                   </Button>
@@ -187,6 +213,6 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
           )}
         </div>
       </div>
-    </>
+    </DrawerPortal>
   )
 }

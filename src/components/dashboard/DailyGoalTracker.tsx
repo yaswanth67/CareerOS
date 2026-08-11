@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Target, Users, BookOpen, CheckCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { format, subDays, addDays, startOfDay, isSameDay } from 'date-fns'
 import { cn } from '@/lib/utils'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 
 interface DailyGoal {
   id: string
@@ -227,6 +227,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [streak, setStreak] = useState(0)
+  const { toast } = useToast()
 
   const fetchDailyGoal = async () => {
     try {
@@ -238,7 +239,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
       }
     } catch (error) {
       console.error('Failed to fetch daily goal:', error)
-      toast.error('Failed to load daily goals')
+      toast({ type: 'error', message: 'Failed to load daily goals' })
     } finally {
       setLoading(false)
     }
@@ -280,13 +281,13 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
       const data = await res.json()
       if (res.ok && data.dailyGoal) {
         setDailyGoal(data.dailyGoal)
-        toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} progress updated!`)
+        toast({ type: 'success', message: `${type.charAt(0).toUpperCase() + type.slice(1)} progress updated!` })
         fetchStreak()
       } else {
-        toast.error('Failed to update progress')
+        toast({ type: 'error', message: 'Failed to update progress' })
       }
     } catch {
-      toast.error('Failed to update progress')
+      toast({ type: 'error', message: 'Failed to update progress' })
     } finally {
       setSaving(false)
     }
@@ -310,7 +311,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
         setDailyGoal(data.dailyGoal)
       }
     } catch {
-      toast.error('Failed to update target')
+      toast({ type: 'error', message: 'Failed to update target' })
     }
   }
 
@@ -447,7 +448,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
                 }),
               }).then(() => {
                 fetchDailyGoal()
-                toast.success('Progress reset for today')
+                toast({ type: 'success', message: 'Progress reset for today' })
               })
             }}
             className="btn-ghost flex-1"
@@ -469,7 +470,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
                   networkingTarget: dailyGoal.networkingTarget,
                   skillLearningTarget: dailyGoal.skillLearningTarget,
                 }),
-              }).then(() => toast.success('Targets copied to tomorrow'))
+              }).then(() => toast({ type: 'success', message: 'Targets copied to tomorrow' }))
             }}
             className="btn-secondary flex-1"
           >

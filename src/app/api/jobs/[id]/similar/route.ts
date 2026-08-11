@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { parseJsonArray } from '@/lib/utils'
 
 // GET /api/jobs/[id]/similar — up to 5 other active jobs of the same role type,
@@ -37,6 +38,7 @@ export async function GET(
       where: {
         roleType: job.roleType,
         isActive: true,
+        ...US_ONLY_WHERE,
         id: { notIn: Array.from(excluded) },
       },
       orderBy: { postedAt: 'desc' },

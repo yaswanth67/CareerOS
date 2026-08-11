@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { normalizeCompany } from '../src/lib/job-fetcher/normalize-company'
 
 const prisma = new PrismaClient()
 
@@ -253,6 +254,8 @@ Python, PyTorch, TensorFlow, Transformers, LangChain, LlamaIndex, CUDA, Kubernet
   ]
 
   for (const job of sampleJobs) {
+    // companySlug is what deduplication matches on — see src/lib/job-fetcher/dedup.ts
+    const data = { ...job, companySlug: normalizeCompany(job.company) }
     await prisma.job.upsert({
       where: {
         externalId_provider: {
@@ -260,8 +263,8 @@ Python, PyTorch, TensorFlow, Transformers, LangChain, LlamaIndex, CUDA, Kubernet
           provider: job.provider,
         },
       },
-      update: job,
-      create: job,
+      update: data,
+      create: data,
     })
   }
 

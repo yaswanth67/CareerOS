@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { batchScoreJobsHeuristic } from '@/lib/ai-matcher'
 import { parseJsonArray, stringifyJsonArray } from '@/lib/utils'
 
@@ -22,6 +23,8 @@ export async function autoScoreUserJobs(userId: string): Promise<number> {
   const unscoredJobs = await prisma.job.findMany({
     where: {
       isActive: true,
+      // No point spending scoring passes on jobs the app will never show.
+      ...US_ONLY_WHERE,
       matches: { none: { resumeId: resume.id } },
     },
     orderBy: { postedAt: 'desc' },

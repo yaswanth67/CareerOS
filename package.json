@@ -14,7 +14,10 @@
     "check-links": "tsx scripts/check-job-links.ts",
     "check-links:fix": "tsx scripts/check-job-links.ts --deactivate",
     "backfill:sponsorship": "tsx scripts/backfill-sponsorship.ts",
-    "postinstall": "prisma generate"
+    "backfill:company-slug": "tsx scripts/backfill-company-slug.ts",
+    "purge:non-us": "tsx scripts/purge-non-us-jobs.ts",
+    "postinstall": "prisma generate",
+    "reclassify:levels": "tsx scripts/reclassify-levels.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.21.0",

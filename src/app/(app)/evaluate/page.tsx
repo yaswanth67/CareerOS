@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { CareerOpsMarkdown, CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 
 interface EvaluatedJob {
   title: string
@@ -36,6 +36,7 @@ interface ResumesApiResponse {
 }
 
 export default function EvaluatePage() {
+  const { toast } = useToast()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +66,7 @@ export default function EvaluatePage() {
     e.preventDefault()
     const trimmed = url.trim()
     if (!trimmed) {
-      toast.error('Paste a job posting link first.')
+      toast({ type: 'error', message: 'Paste a job posting link first.' })
       return
     }
 
@@ -89,14 +90,14 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.report) {
         setResult(data)
-        toast.success('Evaluation complete!')
+        toast({ type: 'success', message: 'Evaluation complete!' })
       } else {
         setError(data?.error || 'Failed to evaluate that job.')
-        toast.error(data?.error || 'Failed to evaluate that job.')
+        toast({ type: 'error', message: data?.error || 'Failed to evaluate that job.' })
       }
     } catch {
       setError('Something went wrong. Try again.')
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setLoading(false)
     }
@@ -120,12 +121,12 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.coverLetter?.markdown) {
         setCoverResult(data.coverLetter.markdown)
-        toast.success('Cover letter generated!')
+        toast({ type: 'success', message: 'Cover letter generated!' })
       } else {
-        toast.error(data?.error || 'Failed to generate cover letter')
+        toast({ type: 'error', message: data?.error || 'Failed to generate cover letter' })
       }
     } catch {
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setCoverLoading(false)
     }
@@ -148,12 +149,12 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.prep?.markdown) {
         setInterviewResult(data.prep.markdown)
-        toast.success('Interview prep generated!')
+        toast({ type: 'success', message: 'Interview prep generated!' })
       } else {
-        toast.error(data?.error || 'Failed to generate interview prep')
+        toast({ type: 'error', message: data?.error || 'Failed to generate interview prep' })
       }
     } catch {
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setInterviewLoading(false)
     }
@@ -176,12 +177,12 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.email?.markdown) {
         setEmailResult(data.email.markdown)
-        toast.success('Email draft generated!')
+        toast({ type: 'success', message: 'Email draft generated!' })
       } else {
-        toast.error(data?.error || 'Failed to generate email')
+        toast({ type: 'error', message: data?.error || 'Failed to generate email' })
       }
     } catch {
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setEmailLoading(false)
     }
@@ -203,12 +204,12 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.upskill?.markdown) {
         setUpskillResult(data.upskill.markdown)
-        toast.success('Upskill analysis generated!')
+        toast({ type: 'success', message: 'Upskill analysis generated!' })
       } else {
-        toast.error(data?.error || 'Failed to generate upskill analysis')
+        toast({ type: 'error', message: data?.error || 'Failed to generate upskill analysis' })
       }
     } catch {
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setUpskillLoading(false)
     }
@@ -230,12 +231,12 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.followup?.markdown) {
         setFollowupResult(data.followup.markdown)
-        toast.success('Follow-up strategy generated!')
+        toast({ type: 'success', message: 'Follow-up strategy generated!' })
       } else {
-        toast.error(data?.error || 'Failed to generate follow-up')
+        toast({ type: 'error', message: data?.error || 'Failed to generate follow-up' })
       }
     } catch {
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setFollowupLoading(false)
     }
@@ -258,12 +259,12 @@ export default function EvaluatePage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.resume?.markdown) {
         setResumeResult(data.resume.markdown)
-        toast.success('Tailored resume generated!')
+        toast({ type: 'success', message: 'Tailored resume generated!' })
       } else {
-        toast.error(data?.error || 'Failed to tailor resume')
+        toast({ type: 'error', message: data?.error || 'Failed to tailor resume' })
       }
     } catch {
-      toast.error('Something went wrong. Try again.')
+      toast({ type: 'error', message: 'Something went wrong. Try again.' })
     } finally {
       setResumeLoading(false)
     }

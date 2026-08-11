@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw, Loader2, Sparkles, Bookmark, Send } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import { AppStatus } from '@/types'
 import { FilterTrigger, FilterPanel } from './FilterPanel'
@@ -17,6 +17,7 @@ export function DashboardHeader() {
   const [refreshing, setRefreshing] = useState(false)
   const [scoring, setScoring] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const { toast } = useToast()
 
   const currentStatus = (searchParams.get('status') || '') as AppStatus | ''
 
@@ -69,11 +70,7 @@ export function DashboardHeader() {
       }
 
       const scored = (data?.scored ?? 0) as number
-      toast.success(
-        scored > 0
-          ? `Scored ${scored.toLocaleString()} jobs`
-          : 'All jobs are already scored'
-      )
+      toast.success(scored > 0 ? `Scored ${scored.toLocaleString()} jobs` : 'All jobs are already scored')
       router.refresh()
     } catch {
       toast.error('Failed to score jobs')

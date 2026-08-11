@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { runEvaluation, isCareerOpsReady } from '@/lib/career-ops'
 import { getResumeForUser } from '@/lib/career-ops/resume-select'
 import { extractJobFromUrl, ExtractionError } from '@/lib/job-fetcher/url-extract'
+import { findDuplicateJob, normalizeCompany } from '@/lib/job-fetcher/dedup'
 import { BaseJobProvider } from '@/lib/job-providers/base'
 import { stringifyJsonArray } from '@/lib/utils'
 
@@ -67,14 +68,28 @@ export async function POST(request: NextRequest) {
       where: { externalId_provider: { externalId, provider: 'OTHER' } },
     })
 
+    // A posting the provider fetches already stores is the *same* job, just
+    // reached a different way — refresh that row instead of adding a second one
+    // under provider OTHER. Without this the same posting appeared twice, since
+    // the externalId+provider key can never match a GREENHOUSE/ASHBY/… row.
+    const duplicate =
+      existing ??
+      (await findDuplicateJob({
+        title: extracted.title,
+        company: extracted.company,
+        location: extracted.location || 'Remote',
+        applyUrl: extracted.applyUrl,
+      }))
+
     let saved: { id: string; isNew: boolean }
-    if (existing) {
+    if (duplicate) {
       await prisma.job.update({
-        where: { id: existing.id },
+        where: { id: duplicate.id },
         data: {
           title: extracted.title,
           company: extracted.company,
-          location: extracted.location || existing.location,
+          companySlug: normalizeCompany(extracted.company),
+          location: extracted.location || duplicate.location,
           description: extracted.description,
           applyUrl: extracted.applyUrl,
           roleType: classified.roleType,
@@ -83,7 +98,7 @@ export async function POST(request: NextRequest) {
           fetchedAt: new Date(),
         },
       })
-      saved = { id: existing.id, isNew: false }
+      saved = { id: duplicate.id, isNew: false }
     } else {
       const created = await prisma.job.create({
         data: {
@@ -91,6 +106,7 @@ export async function POST(request: NextRequest) {
           provider: 'OTHER',
           title: extracted.title,
           company: extracted.company,
+          companySlug: normalizeCompany(extracted.company),
           location: extracted.location || 'Remote',
           isRemote: extracted.location?.toLowerCase().includes('remote') || false,
           description: extracted.description,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { runCoverLetter, isCareerOpsReady } from '@/lib/career-ops'
+import { getResumeForUser } from '@/lib/career-ops/resume-select'
 
 export const runtime = 'nodejs'
 
@@ -19,10 +20,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ready.error }, { status: 400 })
     }
 
-    const resume = await prisma.resume.findFirst({
-      where: { userId: user.id },
-      orderBy: { updatedAt: 'desc' },
-    })
+    // Body is read before the resume so the caller's resume-version choice
+    // applies here too — this route used to ignore it and always take the
+    // latest, unlike every other career-ops route.
+    const body = await request.json().catch(() => ({}))
+    const resume = await getResumeForUser(user.id, body.resumeId)
     if (!resume) {
       return NextResponse.json(
         { error: 'Upload a resume first — cover letters are tailored against it.' },
@@ -30,7 +32,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json().catch(() => ({}))
     const { url, jobId, reportNumber, customJd } = body
 
     // Determine job source: URL, existing job ID, career-ops report, or pasted JD

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import toast from 'react-hot-toast'
+import { useToast } from '@/components/ui/Toast'
 import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 
@@ -24,6 +24,7 @@ type RegisterForm = z.infer<typeof registerSchema>
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -70,11 +71,11 @@ export default function RegisterPage() {
       const result = await res.json()
 
       if (!res.ok) {
-        toast.error(result.error || 'Registration failed')
+        toast({ type: 'error', message: result.error || 'Registration failed' })
         return
       }
 
-      toast.success('Account created! Signing you in...')
+      toast({ type: 'success', message: 'Account created! Signing you in...' })
 
       const signInResult = await signIn('credentials', {
         name: data.name,
@@ -83,14 +84,14 @@ export default function RegisterPage() {
       })
 
       if (signInResult?.error) {
-        toast.error('Account created but sign in failed. Please sign in manually.')
+        toast({ type: 'error', message: 'Account created but sign in failed. Please sign in manually.' })
         router.push('/auth/signin')
       } else {
         router.push('/dashboard')
         router.refresh()
       }
     } catch {
-      toast.error('Something went wrong')
+      toast({ type: 'error', message: 'Something went wrong' })
     } finally {
       setIsLoading(false)
     }
