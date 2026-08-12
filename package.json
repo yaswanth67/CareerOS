@@ -7,7 +7,7 @@
     "build": "NODE_ENV=production next build",
     "start": "NODE_ENV=production next start -p 3000",
     "lint": "eslint .",
-    "setup": "node scripts/setup.mjs",
+    "setup": "SETUP_ORIGIN=setup-full node scripts/setup.mjs",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
@@ -16,7 +16,7 @@
     "backfill:sponsorship": "tsx scripts/backfill-sponsorship.ts",
     "backfill:company-slug": "tsx scripts/backfill-company-slug.ts",
     "purge:non-us": "tsx scripts/purge-non-us-jobs.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "node scripts/setup.mjs",
     "reclassify:levels": "tsx scripts/reclassify-levels.ts"
   },
   "dependencies": {
