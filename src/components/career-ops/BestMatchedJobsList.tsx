@@ -1,10 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, FileCheck, FileText, Loader2, MapPin, Star, Target, TrendingUp, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle2, ExternalLink, FileCheck, FileText, Loader2, MapPin, Star, Target, TrendingUp, X } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { TailorResumeDrawer } from '@/components/dashboard/TailorResumeDrawer'
+import { useToast } from '@/components/ui/Toast'
 import { getScoreColor } from '@/lib/utils'
 
 interface BestMatch {
@@ -45,6 +47,8 @@ interface ResumesApiResponse {
  * score threshold and a resume-version filter. Powering the Best Matches tab.
  */
 export function BestMatchedJobsList() {
+  const router = useRouter()
+  const { toast } = useToast()
   const [threshold, setThreshold] = useState(0)
   const [resumes, setResumes] = useState<ResumeOption[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState<string | 'all'>('all')
@@ -52,6 +56,7 @@ export function BestMatchedJobsList() {
   const [matches, setMatches] = useState<BestMatch[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savingId, setSavingId] = useState<string | null>(null)
   const [tailorJob, setTailorJob] = useState<{ id: string; title: string; company: string } | null>(null)
 
   const fetchResumes = useCallback(async () => {
@@ -94,6 +99,35 @@ export function BestMatchedJobsList() {
     }, 0)
     return () => clearTimeout(timer)
   }, [fetchMatches, fetchResumes])
+
+  // Save the job so it's tracked under Applications. Uses the resume this match
+  // was scored against, falling back to the most recent upload.
+  const handleSave = async (match: BestMatch) => {
+    const resumeId = match.resume?.id ?? resumes[0]?.id
+    if (!resumeId) {
+      toast({ type: 'error', message: 'Upload a resume first to save jobs' })
+      return
+    }
+    setSavingId(match.id)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: match.job.id, resumeId, status: 'SAVED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast({ type: 'success', message: 'Job saved — track it under Applications' })
+        router.refresh()
+      } else {
+        toast({ type: 'error', message: data?.error || 'Failed to save job' })
+      }
+    } catch {
+      toast({ type: 'error', message: 'Failed to save job' })
+    } finally {
+      setSavingId(null)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -180,14 +214,13 @@ export function BestMatchedJobsList() {
           <p className="text-xs mt-1">Lower the threshold or score jobs from the Dashboard / Evaluate tab.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {matches.map(match => (
             <div
               key={match.id}
-              className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+              className="flex flex-col rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-medium text-gray-900 dark:text-white truncate">{match.job.title}</h3>
                     <span
@@ -218,10 +251,39 @@ export function BestMatchedJobsList() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                {/* Full-width action bar — buttons share the space evenly so the
+                    row reads as one clean, centered control strip. */}
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleSave(match)}
+                    disabled={savingId === match.id}
+                  >
+                    {savingId === match.id ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    {savingId === match.id ? 'Saving...' : 'Save'}
+                  </Button>
+                  {match.job.applyUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => window.open(match.job.applyUrl, '_blank', 'noopener,noreferrer')}
+                      title="Open application page"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                      Open
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
                     onClick={() =>
                       setTailorJob({
                         id: match.job.id,
@@ -234,20 +296,8 @@ export function BestMatchedJobsList() {
                     <FileText className="w-3.5 h-3.5 mr-1.5" />
                     Tailor CV
                   </Button>
-                  {match.job.applyUrl && (
-                    <a
-                      href={match.job.applyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Open
-                    </a>
-                  )}
                 </div>
               </div>
-            </div>
           ))}
         </div>
       )}

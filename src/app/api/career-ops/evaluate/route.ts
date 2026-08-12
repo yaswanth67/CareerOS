@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { prisma } from '@/lib/db'
 import { runEvaluation, isCareerOpsReady } from '@/lib/career-ops'
 import { getResumeForUser } from '@/lib/career-ops/resume-select'
 import { extractJobFromUrl, ExtractionError } from '@/lib/job-fetcher/url-extract'
-import { findDuplicateJob, normalizeCompany } from '@/lib/job-fetcher/dedup'
-import { BaseJobProvider } from '@/lib/job-providers/base'
-import { stringifyJsonArray } from '@/lib/utils'
+import { upsertExtractedJob } from '@/lib/job-fetcher/upsert-extracted-job'
 
 // POST /api/career-ops/evaluate — paste a job-posting URL, get the career-ops
 // score. Reads the posting from the link (ATS JSON API → JSON-LD → meta/body
@@ -53,75 +50,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Classify role/experience from the title (same heuristics the providers
-    // use) so the saved job shows proper badges on the Dashboard.
-    const classified = new BaseJobProvider().parseJob({
-      title: extracted.title,
-      location: extracted.location || '',
-      description: extracted.description,
-    })
-
-    // Upsert into the feed (provider OTHER, keyed by the normalized URL) so the
-    // evaluated job shows up on the Dashboard like any other job.
-    const externalId = url
-    const existing = await prisma.job.findUnique({
-      where: { externalId_provider: { externalId, provider: 'OTHER' } },
-    })
-
-    // A posting the provider fetches already stores is the *same* job, just
-    // reached a different way — refresh that row instead of adding a second one
-    // under provider OTHER. Without this the same posting appeared twice, since
-    // the externalId+provider key can never match a GREENHOUSE/ASHBY/… row.
-    const duplicate =
-      existing ??
-      (await findDuplicateJob({
-        title: extracted.title,
-        company: extracted.company,
-        location: extracted.location || 'Remote',
-        applyUrl: extracted.applyUrl,
-      }))
-
-    let saved: { id: string; isNew: boolean }
-    if (duplicate) {
-      await prisma.job.update({
-        where: { id: duplicate.id },
-        data: {
-          title: extracted.title,
-          company: extracted.company,
-          companySlug: normalizeCompany(extracted.company),
-          location: extracted.location || duplicate.location,
-          description: extracted.description,
-          applyUrl: extracted.applyUrl,
-          roleType: classified.roleType,
-          experienceLevel: classified.experienceLevel,
-          isActive: true,
-          fetchedAt: new Date(),
-        },
-      })
-      saved = { id: duplicate.id, isNew: false }
-    } else {
-      const created = await prisma.job.create({
-        data: {
-          externalId,
-          provider: 'OTHER',
-          title: extracted.title,
-          company: extracted.company,
-          companySlug: normalizeCompany(extracted.company),
-          location: extracted.location || 'Remote',
-          isRemote: extracted.location?.toLowerCase().includes('remote') || false,
-          description: extracted.description,
-          requirements: stringifyJsonArray([]),
-          skills: stringifyJsonArray([]),
-          experienceLevel: classified.experienceLevel,
-          roleType: classified.roleType,
-          currency: 'USD',
-          applyUrl: extracted.applyUrl,
-          postedAt: new Date(),
-          isActive: true,
-        },
-      })
-      saved = { id: created.id, isNew: true }
-    }
+    // Classify + upsert into the feed (provider OTHER, keyed by the URL) so the
+    // evaluated job shows up on the Dashboard like any other job. Same helper
+    // the Tools "Paste link" resolve route uses. Keep the response shape the
+    // client already expects ({ id, isNew }).
+    const { job: savedJob, isNew } = await upsertExtractedJob(extracted, url)
+    const saved = { id: savedJob.id, isNew }
 
     const report = await runEvaluation({
       job: {
