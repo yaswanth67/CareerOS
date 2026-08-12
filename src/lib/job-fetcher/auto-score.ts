@@ -4,8 +4,8 @@ import { batchScoreJobsHeuristic } from '@/lib/ai-matcher'
 import { parseJsonArray, stringifyJsonArray } from '@/lib/utils'
 
 /**
- * Automatically score the user's jobs against their most recent resume using
- * the fast heuristic scorer (no LLM calls). Only scores jobs that don't have a
+ * Automatically score the user's jobs against a specific resume (or all resumes if resumeId not provided)
+ * using the fast heuristic scorer (no LLM calls). Only scores jobs that don't have a
  * match yet, so repeated fetches stay cheap and incremental.
  *
  * Matches are written with a single bulk createMany (SQLite doesn't support
@@ -13,62 +13,69 @@ import { parseJsonArray, stringifyJsonArray } from '@/lib/utils'
  *
  * Returns the number of jobs newly scored.
  */
-export async function autoScoreUserJobs(userId: string): Promise<number> {
-  const resume = await prisma.resume.findFirst({
-    where: { userId },
-    orderBy: { updatedAt: 'desc' },
-  })
-  if (!resume) return 0
+export async function autoScoreUserJobs(userId: string, resumeId?: string): Promise<number> {
+  // If resumeId is provided, score only that resume; otherwise score all user's resumes
+  const resumes = resumeId
+    ? await prisma.resume.findMany({ where: { id: resumeId, userId } })
+    : await prisma.resume.findMany({ where: { userId }, orderBy: { updatedAt: 'desc' } })
 
-  const unscoredJobs = await prisma.job.findMany({
-    where: {
-      isActive: true,
-      // No point spending scoring passes on jobs the app will never show.
-      ...US_ONLY_WHERE,
-      matches: { none: { resumeId: resume.id } },
-    },
-    orderBy: { postedAt: 'desc' },
-  })
+  if (resumes.length === 0) return 0
 
-  if (unscoredJobs.length === 0) return 0
+  let totalScored = 0
 
-  const results = await batchScoreJobsHeuristic(
-    resume.parsedText,
-    parseJsonArray(resume.skills) as string[],
-    unscoredJobs.map(job => ({
-      id: job.id,
-      title: job.title,
-      company: job.company,
-      description: job.description,
-      skills: parseJsonArray(job.skills) as string[],
-      experienceLevel: job.experienceLevel,
-      roleType: job.roleType,
-    }))
-  )
-
-  const rows = []
-  for (const job of unscoredJobs) {
-    const result = results.get(job.id)
-    if (!result) continue
-    rows.push({
-      jobId: job.id,
-      resumeId: resume.id,
-      score: result.score,
-      reasoning: result.reasoning,
-      matchedSkills: stringifyJsonArray(result.matchedSkills),
-      missingSkills: stringifyJsonArray(result.missingSkills),
+  for (const resume of resumes) {
+    const unscoredJobs = await prisma.job.findMany({
+      where: {
+        isActive: true,
+        // No point spending scoring passes on jobs the app will never show.
+        ...US_ONLY_WHERE,
+        matches: { none: { resumeId: resume.id } },
+      },
+      orderBy: { postedAt: 'desc' },
     })
+
+    if (unscoredJobs.length === 0) continue
+
+    const results = await batchScoreJobsHeuristic(
+      resume.parsedText,
+      parseJsonArray(resume.skills) as string[],
+      unscoredJobs.map(job => ({
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        description: job.description,
+        skills: parseJsonArray(job.skills) as string[],
+        experienceLevel: job.experienceLevel,
+        roleType: job.roleType,
+      }))
+    )
+
+    const rows = []
+    for (const job of unscoredJobs) {
+      const result = results.get(job.id)
+      if (!result) continue
+      rows.push({
+        jobId: job.id,
+        resumeId: resume.id,
+        score: result.score,
+        reasoning: result.reasoning,
+        matchedSkills: stringifyJsonArray(result.matchedSkills),
+        missingSkills: stringifyJsonArray(result.missingSkills),
+      })
+    }
+
+    if (rows.length === 0) continue
+
+    // Insert in chunks to keep the single SQLite writer happy.
+    const CHUNK = 500
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      await prisma.match.createMany({ data: rows.slice(i, i + CHUNK) })
+    }
+
+    totalScored += rows.length
   }
 
-  if (rows.length === 0) return 0
-
-  // Insert in chunks to keep the single SQLite writer happy.
-  const CHUNK = 500
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    await prisma.match.createMany({ data: rows.slice(i, i + CHUNK) })
-  }
-
-  return rows.length
+  return totalScored
 }
 
 /**

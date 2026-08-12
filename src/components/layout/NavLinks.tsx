@@ -10,10 +10,10 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Best Matches', href: '/matches', icon: Star },
   { name: 'AI Career', href: '/ai', icon: Sparkles },
-  { name: 'Analytics', href: '/analytics', icon: BarChart2 },
   { name: 'Resumes', href: '/resumes', icon: FileText },
   { name: 'Applications', href: '/applications', icon: ClipboardList },
   { name: 'Advanced AI tools', href: '/tools', icon: Wrench },
+  { name: 'Analytics', href: '/analytics', icon: BarChart2 },
   { name: 'Preferences', href: '/preferences', icon: Settings },
 ]
 

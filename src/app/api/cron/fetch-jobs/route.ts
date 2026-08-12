@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // Guard-rail: deactivate jobs whose apply links are broken/fabricated
     const linkCheck = await checkJobLinks({ deactivate: true })
 
-    // Auto-score jobs for every user with a resume so scores stay fresh
+    // Auto-score jobs for every user with a resume so scores stay fresh (all resumes)
     const scoredByUser = await autoScoreAllUsers()
     const totalScored = scoredByUser.reduce((sum, u) => sum + u.scored, 0)
 

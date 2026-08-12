@@ -36,16 +36,35 @@ export async function POST(request: NextRequest) {
         where: { id: { in: jobIds }, isActive: true, ...US_ONLY_WHERE },
       })
     } else {
-      // Score against all active jobs (with pagination in real app)
+      // Score against all active jobs that don't have a match for this resume yet
       jobs = await prisma.job.findMany({
-        where: { isActive: true, ...US_ONLY_WHERE },
-        take: 25, // Cap for responsive heuristic scoring
+        where: {
+          isActive: true,
+          ...US_ONLY_WHERE,
+          matches: { none: { resumeId } },
+        },
+        take: 100, // Cap for responsive heuristic scoring
         orderBy: { postedAt: 'desc' },
       })
     }
 
     if (jobs.length === 0) {
-      return NextResponse.json({ matches: [] })
+      // If no new jobs to score, return existing matches
+      const existingMatches = await prisma.match.findMany({
+        where: { resumeId, job: { isActive: true, ...US_ONLY_WHERE } },
+        include: { job: true },
+        orderBy: { score: 'desc' },
+        take: 100,
+      })
+      return NextResponse.json({
+        matches: existingMatches.map(m => ({
+          jobId: m.jobId,
+          score: m.score,
+          reasoning: m.reasoning,
+          matchedSkills: parseJsonArray(m.matchedSkills),
+          missingSkills: parseJsonArray(m.missingSkills),
+        }))
+      })
     }
 
     // Score jobs against resume (skills/requirements are stored as JSON strings)
@@ -133,6 +152,17 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
+    // Get application statuses for these jobs for this user
+    const jobIds = matchesRaw.map(m => m.job.id)
+    const applications = await prisma.application.findMany({
+      where: {
+        userId: user.id,
+        jobId: { in: jobIds },
+      },
+      select: { jobId: true, status: true },
+    })
+    const applicationStatusMap = new Map(applications.map(a => [a.jobId, a.status]))
+
     // Normalize JSON-string columns for the client
     const matches = matchesRaw.map(match => ({
       ...match,
@@ -142,6 +172,7 @@ export async function GET(request: NextRequest) {
         ...match.job,
         skills: parseJsonArray(match.job.skills),
         requirements: parseJsonArray(match.job.requirements),
+        applicationStatus: applicationStatusMap.get(match.job.id) || null,
       },
     }))
 

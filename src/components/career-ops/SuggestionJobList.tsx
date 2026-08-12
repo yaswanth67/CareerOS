@@ -45,6 +45,10 @@ interface SuggestionJobListProps {
   /** Keyword from the suggestion card that opened this list. */
   keyword: string
   resumeId?: string
+  /** Optional initial jobs to display without fetching. */
+  initialJobs?: SuggestionJob[]
+  /** Callback when jobs are fetched (to update parent cache). */
+  onJobsFetched?: (jobs: SuggestionJob[]) => void
 }
 
 /** Where a posting lives, so the user can see it is the company's own board. */
@@ -72,13 +76,18 @@ function daysAgo(iso: string): string {
  * Replaces what this used to be — a link to a Google search for the keyword,
  * which never showed a posting and never produced an apply URL.
  */
-export function SuggestionJobList({ keyword, resumeId }: SuggestionJobListProps) {
+export function SuggestionJobList({
+  keyword,
+  resumeId,
+  initialJobs,
+  onJobsFetched,
+}: SuggestionJobListProps) {
   const { toast } = useToast()
-  const [jobs, setJobs] = useState<SuggestionJob[]>([])
+  const [jobs, setJobs] = useState<SuggestionJob[]>(initialJobs || [])
   // Jobs saved during this session, so the button can confirm without a refetch.
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [savingId, setSavingId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initialJobs ? false : true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -111,6 +120,10 @@ export function SuggestionJobList({ keyword, resumeId }: SuggestionJobListProps)
         }
         setFetchCount(n => n + 1)
         setJobs(data.jobs || [])
+        // Notify parent so it can update its cache
+        if (onJobsFetched && data.jobs) {
+          onJobsFetched(data.jobs)
+        }
         if (data.refreshed) {
           setNotice(
             `Live refresh: ${data.refreshed.jobsNew} new US postings added, ` +
@@ -126,13 +139,16 @@ export function SuggestionJobList({ keyword, resumeId }: SuggestionJobListProps)
         setRefreshing(false)
       }
     },
-    [keyword, resumeId]
+    [keyword, resumeId, onJobsFetched]
   )
 
   useEffect(() => {
-    const timer = setTimeout(() => load(false), 0)
-    return () => clearTimeout(timer)
-  }, [load])
+    // Only auto-fetch if no initial jobs were provided
+    if (!initialJobs) {
+      const timer = setTimeout(() => load(false), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [load, initialJobs])
 
   /**
    * Save a posting to the tracker as SAVED, which is what puts it on the

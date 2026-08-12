@@ -119,7 +119,8 @@ async function getJobs(filters: JobListFilters) {
     prisma.job.findMany({
       where,
       orderBy: { postedAt: 'desc' },
-      take: page * PAGE_SIZE,
+      // Fetch extra jobs so we can diversify by company before slicing to page size
+      take: page * PAGE_SIZE * 3,
       include: {
         matches: {
           where: { resume: { userId: user.id } },
@@ -174,8 +175,43 @@ async function getJobs(filters: JobListFilters) {
     return b.postedAt.getTime() - a.postedAt.getTime()
   })
 
+  // Diversify by company: limit results per company so one company doesn't
+  // dominate the feed (e.g., Amazon returning hundreds of recent postings).
+  // We interleave companies to give a mixed, balanced view.
+  function diversifyByCompany(jobs: typeof jobsWithMatch, maxPerCompany = 3): typeof jobsWithMatch {
+    const companyGroups = new Map<string, typeof jobsWithMatch>()
+    for (const job of jobs) {
+      const key = job.company.toLowerCase()
+      const arr = companyGroups.get(key) || []
+      arr.push(job)
+      companyGroups.set(key, arr)
+    }
+
+    const diversified: typeof jobsWithMatch = []
+    let anyAdded = true
+    while (anyAdded && diversified.length < jobsWithMatch.length) {
+      anyAdded = false
+      for (const [, companyJobs] of companyGroups) {
+        if (companyJobs.length > 0 && diversified.length < jobsWithMatch.length) {
+          diversified.push(companyJobs.shift()!)
+          anyAdded = true
+        }
+      }
+    }
+    // Apply per-company cap
+    const companyCount = new Map<string, number>()
+    return diversified.filter(job => {
+      const key = job.company.toLowerCase()
+      const count = (companyCount.get(key) || 0) + 1
+      companyCount.set(key, count)
+      return count <= maxPerCompany
+    })
+  }
+
+  const diversifiedJobs = diversifyByCompany(jobsWithMatch, 3)
+
   return {
-    jobs: jobsWithMatch,
+    jobs: diversifiedJobs,
     resumeId: resume?.id,
     hasMore: total > jobs.length,
     nextPage: page + 1,

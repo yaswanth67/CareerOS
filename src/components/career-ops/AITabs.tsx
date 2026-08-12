@@ -18,6 +18,9 @@ const TABS: { id: TabId; label: string; icon: typeof Search }[] = [
  * Tab bar for the AI Career page — scan your resume for role suggestions, or
  * paste a job posting for a full A–G evaluation. The active tab is mirrored in
  * the URL (?tab=evaluate) so it's shareable and browser-back friendly.
+ *
+ * Both components are ALWAYS mounted to preserve scan state and background scans
+ * when switching between tabs. The inactive one is hidden with CSS.
  */
 export function AITabs({ initialTab }: { initialTab: TabId }) {
   const router = useRouter()
@@ -49,7 +52,14 @@ export function AITabs({ initialTab }: { initialTab: TabId }) {
         ))}
       </div>
 
-      {tab === 'suggestions' ? <ResumeSuggestions /> : <EvaluateJob />}
+      {/* Both components always mounted to preserve scan state across tab switches.
+          The inactive one is hidden via CSS (display: none). */}
+      <div style={{ display: tab === 'suggestions' ? 'block' : 'none' }}>
+        <ResumeSuggestions />
+      </div>
+      <div style={{ display: tab === 'evaluate' ? 'block' : 'none' }}>
+        <EvaluateJob />
+      </div>
     </div>
   )
 }
