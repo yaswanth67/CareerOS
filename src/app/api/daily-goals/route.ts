@@ -3,6 +3,14 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { startOfDay, endOfDay, format, subDays } from 'date-fns'
 
+// `new Date('2026-08-12')` parses as UTC midnight, which rolls back to the
+// *previous* local day in any negative-offset timezone — so "today" was being
+// stored and read as yesterday. Parse `yyyy-MM-dd` as a local midnight instead.
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, (month || 1) - 1, day || 1)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -12,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date') || format(new Date(), 'yyyy-MM-dd')
-    const date = new Date(dateParam)
+    const date = parseLocalDate(dateParam)
 
     // Check if this is a streak request
     if (searchParams.get('streak') === 'true') {
@@ -147,7 +155,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { date, applicationsTarget, applicationsCompleted, networkingTarget, networkingCompleted, skillLearningTarget, skillLearningCompleted } = body
 
-    const targetDate = date ? new Date(date) : new Date()
+    const targetDate = date ? parseLocalDate(date) : new Date()
 
     const dailyGoal = await prisma.dailyGoal.upsert({
       where: {
@@ -198,9 +206,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action, date } = body
 
-    const targetDate = date ? new Date(date) : new Date()
+    const targetDate = date ? parseLocalDate(date) : new Date()
 
-    if (action === 'increment-applications') {
+    // The client sends `increment-${type}` where skill learning's type is
+    // camelCase (`increment-skillLearning`). Normalize to the kebab-case the
+    // handlers below check against, so the button works for all three goals.
+    const normalizedAction = String(action ?? '').replace('skillLearning', 'skill-learning')
+
+    if (normalizedAction === 'increment-applications') {
       const dailyGoal = await prisma.dailyGoal.upsert({
         where: {
           userId_date: {
@@ -231,7 +244,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (action === 'increment-networking') {
+    if (normalizedAction === 'increment-networking') {
       const dailyGoal = await prisma.dailyGoal.upsert({
         where: {
           userId_date: {
@@ -262,7 +275,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (action === 'increment-skill-learning') {
+    if (normalizedAction === 'increment-skill-learning') {
       const dailyGoal = await prisma.dailyGoal.upsert({
         where: {
           userId_date: {

@@ -12,7 +12,7 @@ export default function HomePage() {
   useEffect(() => {
     if (status === 'loading') return
     if (session) {
-      router.push('/dashboard')
+      router.push('/onboarding')
     } else {
       router.push('/auth/signin')
     }

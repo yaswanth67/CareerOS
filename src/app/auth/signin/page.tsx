@@ -21,8 +21,14 @@ type SignInForm = z.infer<typeof signInSchema>
 function SignInForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const error = searchParams.get('error')
+
+  // Preserve an internal callbackUrl as the post-onboarding destination, but
+  // never route through the auth or onboarding pages themselves (open-redirect guard).
+  const rawCallback = searchParams.get('callbackUrl')
+  const isInternal = (p: string | null) =>
+    !!p && p.startsWith('/') && !p.startsWith('//') && p !== '/auth/signin' && p !== '/auth/register' && p !== '/onboarding'
+  const target = isInternal(rawCallback) ? rawCallback! : '/dashboard'
 
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -53,7 +59,9 @@ function SignInForm() {
         toast({ type: 'error', message: result.error })
       } else {
         toast({ type: 'success', message: `Welcome back, ${data.name}!` })
-        router.push(callbackUrl)
+        // Route through onboarding so jobs are refreshed + matches re-scored,
+        // then continue to the intended page.
+        router.push(`/onboarding?next=${encodeURIComponent(target)}`)
         router.refresh()
       }
     } catch {

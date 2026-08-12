@@ -6,14 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
+import { MultiSelectDropdown } from '@/components/ui/MultiSelectDropdown'
 import { RoleType } from '@/types'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import {
-  Loader2, MapPin, Globe, Ban, DollarSign, X, Plus, Briefcase, Save, Sparkles,
+  Loader2, MapPin, Globe, Ban, DollarSign, Briefcase, Save, Sparkles,
 } from 'lucide-react'
 
 const preferencesSchema = z.object({
@@ -121,75 +121,26 @@ function SectionHeader({
   )
 }
 
-function ChipGroup({
-  items,
-  onRemove,
-  variant = 'gray',
-  emptyMessage = 'None added yet',
-}: {
-  items: string[]
-  onRemove: (item: string) => void
-  variant?: 'gray' | 'danger'
-  emptyMessage?: string
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item) => (
-        <Badge key={item} variant={variant} className="flex items-center gap-1.5">
-          {item}
-          <button
-            type="button"
-            onClick={() => onRemove(item)}
-            className="hover:opacity-70"
-            aria-label={`Remove ${item}`}
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </Badge>
-      ))}
-      {items.length === 0 && (
-        <span className="text-xs text-gray-400">{emptyMessage}</span>
-      )}
-    </div>
-  )
-}
+// Common US metros to pick from — the app is US-only, so this list covers the
+// biggest engineering hubs. The dropdown also accepts any custom value typed
+// in the search box, so nothing is hard-blocked.
+const locationOptions = [
+  'Remote', 'San Francisco', 'New York', 'Seattle', 'Austin', 'Boston',
+  'Los Angeles', 'Chicago', 'Denver', 'Atlanta', 'Washington DC', 'San Diego',
+  'Dallas', 'Portland', 'Raleigh', 'Phoenix', 'Miami', 'Minneapolis',
+  'Philadelphia', 'Houston', 'Nashville', 'Charlotte', 'Pittsburgh', 'Salt Lake City',
+]
 
-function AddInput({
-  value,
-  onChange,
-  placeholder,
-  onAdd,
-  disabled = false,
-}: {
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-  onAdd: () => void
-  disabled?: boolean
-}) {
-  return (
-    <div className="flex gap-2">
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onAdd(); } }}
-        placeholder={placeholder}
-        className="flex-1"
-        disabled={disabled}
-      />
-      <Button type="button" variant="secondary" size="sm" onClick={onAdd} disabled={disabled || !value.trim()}>
-        <Plus className="w-4 h-4" />
-        <span className="hidden sm:inline">Add</span>
-      </Button>
-    </div>
-  )
-}
+// Common exclusions for filtering job titles/descriptions.
+const keywordOptions = [
+  'senior', 'lead', 'principal', 'manager', 'director', 'staff', 'head',
+  '5+ years', '10+ years', '15+ years', 'PhD', 'clearance', 'contract',
+  'C2C', 'commission', 'part-time',
+]
 
 export default function PreferencesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [locationInput, setLocationInput] = useState('')
-  const [keywordInput, setKeywordInput] = useState('')
   const { toast } = useToast()
 
   const {
@@ -260,28 +211,6 @@ export default function PreferencesPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const addLocation = () => {
-    if (locationInput.trim() && !locations.includes(locationInput.trim())) {
-      setValue('locations', [...locations, locationInput.trim()])
-      setLocationInput('')
-    }
-  }
-
-  const removeLocation = (loc: string) => {
-    setValue('locations', locations.filter(l => l !== loc))
-  }
-
-  const addKeyword = () => {
-    if (keywordInput.trim() && !excludedKeywords.includes(keywordInput.trim())) {
-      setValue('excludedKeywords', [...excludedKeywords, keywordInput.trim()])
-      setKeywordInput('')
-    }
-  }
-
-  const removeKeyword = (kw: string) => {
-    setValue('excludedKeywords', excludedKeywords.filter(k => k !== kw))
   }
 
   if (isLoading) {
@@ -437,18 +366,14 @@ export default function PreferencesPage() {
                 title="Preferred Locations"
                 description="Cities or regions you'd like to work in"
               />
-              <div className="mt-3 space-y-3">
-                <ChipGroup
-                  items={locations}
-                  onRemove={removeLocation}
-                  variant="gray"
-                  emptyMessage="No locations added yet"
-                />
-                <AddInput
-                  value={locationInput}
-                  onChange={setLocationInput}
-                  placeholder="e.g., San Francisco, New York, Austin"
-                  onAdd={addLocation}
+              <div className="mt-3">
+                <MultiSelectDropdown
+                  options={locationOptions}
+                  selected={locations}
+                  onChange={(next) => setValue('locations', next)}
+                  placeholder="Select locations…"
+                  searchPlaceholder="Search cities or type to add…"
+                  emptyMessage="No matching cities"
                 />
               </div>
             </Card>
@@ -460,18 +385,15 @@ export default function PreferencesPage() {
                 title="Excluded Keywords"
                 description="Filter out jobs containing these words"
               />
-              <div className="mt-3 space-y-3">
-                <ChipGroup
-                  items={excludedKeywords}
-                  onRemove={removeKeyword}
-                  variant="danger"
-                  emptyMessage="No exclusions set"
-                />
-                <AddInput
-                  value={keywordInput}
-                  onChange={setKeywordInput}
-                  placeholder="e.g., senior, lead, principal, manager"
-                  onAdd={addKeyword}
+              <div className="mt-3">
+                <MultiSelectDropdown
+                  options={keywordOptions}
+                  selected={excludedKeywords}
+                  onChange={(next) => setValue('excludedKeywords', next)}
+                  placeholder="Select keywords to exclude…"
+                  searchPlaceholder="Search or type to add…"
+                  emptyMessage="No matching keywords"
+                  chipVariant="danger"
                 />
               </div>
             </Card>

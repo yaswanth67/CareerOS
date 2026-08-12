@@ -18,6 +18,11 @@ export default async function DashboardPage({
   const user = await getCurrentUser()
   if (!user) redirect('/auth/signin')
 
+  // Matches are scored against a resume — a user with none should complete
+  // onboarding (upload + fetch) before seeing the dashboard.
+  const resumeCount = await prisma.resume.count({ where: { userId: user.id } })
+  if (resumeCount === 0) redirect('/onboarding')
+
   const selectedCountry = params.country as string | undefined
 
   const [jobStats, matchesCount, strongMatches, applicationsCount] = await Promise.all([

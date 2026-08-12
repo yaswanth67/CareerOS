@@ -87,7 +87,7 @@ export default function RegisterPage() {
         toast({ type: 'error', message: 'Account created but sign in failed. Please sign in manually.' })
         router.push('/auth/signin')
       } else {
-        router.push('/dashboard')
+        router.push('/onboarding')
         router.refresh()
       }
     } catch {
