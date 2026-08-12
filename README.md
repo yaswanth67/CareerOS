@@ -440,18 +440,24 @@ npm run postinstall  # Full setup (the hook `npm install` runs automatically)
 
 ---
 
-## Roadmap (ideas for later)
+## Roadmap
 
-- [ ] **Job detail page** (`/jobs/[id]`) — full description, salary, apply CTA
-- [x] **Applications tracker UI** — `/applications` with status pipeline (SAVED → APPLIED → INTERVIEWING → OFFER/REJECTED), notes, and filters (a kanban board is still optional)
-- [ ] **Dedicated matches view** — browse jobs sorted by match score (API already supports `includeMatches&minScore`)
+**Shipped**
+
+- [x] **Job detail view** — full description, salary, and apply CTA. Shipped as a dashboard **drawer** (`JobDetailDrawer`), not a routed `/jobs/[id]` page — a `GET /api/jobs/[id]` endpoint exists, so a standalone page is still optional
+- [x] **Applications tracker UI** — `/applications` with status pipeline (SAVED → APPLIED → INTERVIEWING → OFFER/REJECTED → WITHDRAWN), notes, and filters, plus an application calendar and insights
+- [x] **Dedicated matches view** — `/matches` browses jobs sorted by best match score with a threshold slider (`includeMatches&minScore`)
+- [x] **More job providers** — **Ashby** wired into `src/lib/job-fetcher/index.ts`, plus public boards Remotive / RemoteOK / Arbeitnow / Jobicy. **Workable** and custom scrapers are still open (extend `BaseJobProvider`)
+- [x] **Deployment config — Vercel** — `vercel.json` schedules `/api/cron/fetch-jobs` via `crons`
+
+**Open**
+
 - [ ] **Infinite scroll** on the dashboard (currently a **Load More** button)
 - [ ] **Salary filter UI** (schema + API already have `salaryMin/Max`)
-- [ ] **More job providers** — add e.g. Workable, Ashby, or custom scrapers (extend `BaseJobProvider` and register in `src/lib/job-fetcher/index.ts`)
-- [ ] **AI resume feedback** — a prompt that suggests improvements (connection already wired)
-- [ ] **Email notifications** for new strong matches (cron endpoint already exists)
-- [ ] **Tests** — unit tests for matcher fallback + provider parsers, and e2e for the auth/fetch/matches flow
-- [ ] **Deployment configs** — Dockerfile, `vercel.json` (with `crons`) scheduling `/api/cron/fetch-jobs`
+- [ ] **AI resume feedback** — a prompt that suggests improvements (the connection is wired; note `/suggestions` currently offers role-title suggestions, not feedback)
+- [ ] **Email notifications** for new strong matches (the cron endpoint exists, but sending isn't wired)
+- [ ] **Tests** — today there are ad-hoc `.mjs` scripts for sponsorship / dedup / location, but no unit tests for the matcher fallback or provider parsers, no e2e for the auth/fetch/matches flow, and no `npm test` runner
+- [ ] **Dockerfile** — container image for the app (the Vercel config is already in place)
 - [ ] **Migrate SQLite → Postgres** when needed (Prisma makes this a config change + array handling)
 
 ---
