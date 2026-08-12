@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         const deactivated = await deactivateExpiredJobs()
         if (request.signal.aborted) return
 
-        send({ type: 'phase', phase: 'score', message: 'Scoring matches against your resume…' })
+        send({ type: 'phase', phase: 'score', message: 'Scoring matches against all your resumes…' })
         const scored = await autoScoreUserJobs(user.id)
 
         send({

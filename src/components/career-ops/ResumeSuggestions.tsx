@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, ChevronDown, Copy, Loader2, Search, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CheckCircle2, ChevronDown, Copy, Loader2, Search, Sparkles, Share2 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
-import { SuggestionJobList } from '@/components/career-ops/SuggestionJobList'
+import { SuggestionJobList, type SuggestionJob } from '@/components/career-ops/SuggestionJobList'
 
 interface RoleSuggestion {
   title: string
@@ -58,6 +58,90 @@ export function ResumeSuggestions() {
   // Which suggestion has its real-job list open. One at a time keeps the page
   // short and means only one query is in flight.
   const [openJobsFor, setOpenJobsFor] = useState<string | null>(null)
+  // Track if auto-scan has been triggered
+  const [hasAutoScanned, setHasAutoScanned] = useState(false)
+  // Track if scan is running in background (persisted to sessionStorage)
+  const [isScanningInBackground, setIsScanningInBackground] = useState(false)
+  // Track if a manual scan is in progress (persisted to sessionStorage)
+  const [isManualScanActive, setIsManualScanActive] = useState(false)
+
+  // Scan state keys for sessionStorage
+  const SCAN_STATE_KEY = 'career-ops-scan-state'
+
+  // Cache fetched jobs per (keyword + resumeId) so switching tabs or reopening doesn't refetch.
+  const [jobsCache, setJobsCache] = useState<Map<string, SuggestionJob[]>>(new Map())
+  const cacheRef = useRef(jobsCache)
+  cacheRef.current = jobsCache
+
+  const cacheKey = (keyword: string, resumeId?: string) => `${resumeId || 'latest'}::${keyword}`
+
+  // Load cached suggestions from localStorage on mount
+  useEffect(() => {
+    const cached = localStorage.getItem('career-ops-suggestions')
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached)
+        // Only restore if it's for the same user (we could add userId check)
+        if (parsed.suggestions && parsed.suggestions.length > 0) {
+          setSuggestions(parsed.suggestions)
+          setMarkdown(parsed.markdown)
+          setSelectedResumeId(parsed.resumeId || '')
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+  }, [])
+
+  // Load scan state from sessionStorage on mount
+  useEffect(() => {
+    const scanState = sessionStorage.getItem(SCAN_STATE_KEY)
+    if (scanState) {
+      try {
+        const parsed = JSON.parse(scanState)
+        if (parsed.isScanningInBackground) {
+          setIsScanningInBackground(true)
+        }
+        if (parsed.isManualScanActive) {
+          setIsManualScanActive(true)
+          setLoading(true)
+        }
+        if (parsed.hasAutoScanned) {
+          setHasAutoScanned(true)
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+  }, [])
+
+  // Save scan state to sessionStorage when it changes
+  useEffect(() => {
+    const state = {
+      isScanningInBackground,
+      isManualScanActive,
+      hasAutoScanned,
+      timestamp: Date.now()
+    }
+    sessionStorage.setItem(SCAN_STATE_KEY, JSON.stringify(state))
+  }, [isScanningInBackground, isManualScanActive, hasAutoScanned])
+
+  // Save suggestions to localStorage when they change
+  useEffect(() => {
+    if (suggestions.length > 0) {
+      localStorage.setItem('career-ops-suggestions', JSON.stringify({
+        suggestions,
+        markdown,
+        resumeId: selectedResumeId,
+        timestamp: Date.now()
+      }))
+    }
+  }, [suggestions, markdown, selectedResumeId])
+
+  // Clear cache when resume selection changes
+  useEffect(() => {
+    setJobsCache(new Map())
+  }, [selectedResumeId])
 
   const fetchResumes = useCallback(async () => {
     setResumesLoading(true)
@@ -77,12 +161,33 @@ export function ResumeSuggestions() {
     return () => clearTimeout(timer)
   }, [fetchResumes])
 
-  const handleScan = async () => {
-    setLoading(true)
-    setError(null)
-    setSuggestions([])
-    setMarkdown(null)
-    setOpenJobsFor(null)
+  // Auto-scan on mount if no cached results
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!hasAutoScanned && suggestions.length === 0) {
+        handleScan(true) // true = isAutoScan
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [hasAutoScanned, suggestions.length])
+
+  // Clear job cache when resume selection changes, since different resumes yield different results
+  useEffect(() => {
+    setJobsCache(new Map())
+  }, [selectedResumeId])
+
+  const handleScan = async (isAutoScan = false) => {
+    if (!isAutoScan) {
+      setLoading(true)
+      setIsManualScanActive(true)
+      setError(null)
+      setSuggestions([])
+      setMarkdown(null)
+      setOpenJobsFor(null)
+      setJobsCache(new Map()) // Clear job cache for new scan
+    } else {
+      setIsScanningInBackground(true)
+    }
 
     // The local Claude proxy is slow (~110 output tokens/sec), and the titles
     // eval sends an ~11k-token prompt plus a long report — 1–3 min is normal.
@@ -101,10 +206,14 @@ export function ResumeSuggestions() {
       if (res.ok && data.markdown) {
         setSuggestions(data.suggestions || [])
         setMarkdown(data.markdown)
-        toast({ type: 'success', message: 'Role suggestions ready!' })
+        if (!isAutoScan) {
+          toast({ type: 'success', message: 'Role suggestions ready!' })
+        }
       } else {
         setError(data?.error || 'Failed to scan your resume.')
-        toast({ type: 'error', message: data?.error || 'Failed to scan your resume.' })
+        if (!isAutoScan) {
+          toast({ type: 'error', message: data?.error || 'Failed to scan your resume.' })
+        }
       }
     } catch (err) {
       const aborted = err instanceof DOMException && err.name === 'AbortError'
@@ -112,10 +221,18 @@ export function ResumeSuggestions() {
         ? 'Timed out after 4 minutes — your Claude connection (port 20128) is unusually slow or not responding. Check your Claude Code session and retry.'
         : 'Something went wrong. Try again.'
       setError(message)
-      toast({ type: 'error', message })
+      if (!isAutoScan) {
+        toast({ type: 'error', message })
+      }
     } finally {
       clearTimeout(timeoutId)
-      setLoading(false)
+      if (!isAutoScan) {
+        setLoading(false)
+        setIsManualScanActive(false)
+      } else {
+        setIsScanningInBackground(false)
+      }
+      setHasAutoScanned(true)
     }
   }
 
@@ -125,6 +242,19 @@ export function ResumeSuggestions() {
       setCopied(keyword)
       setTimeout(() => setCopied(null), 1500)
       toast({ type: 'success', message: `Keyword copied: ${keyword}` })
+    } catch {
+      toast({ type: 'error', message: 'Could not copy. Select and copy manually.' })
+    }
+  }
+
+  const handleRefer = async (suggestion: RoleSuggestion) => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const referUrl = `${baseUrl}/ai?tab=evaluate&keyword=${encodeURIComponent(suggestion.keyword)}&title=${encodeURIComponent(suggestion.title)}`
+    try {
+      await navigator.clipboard.writeText(referUrl)
+      setCopied(suggestion.keyword)
+      setTimeout(() => setCopied(null), 1500)
+      toast({ type: 'success', message: 'Referral link copied!' })
     } catch {
       toast({ type: 'error', message: 'Could not copy. Select and copy manually.' })
     }
@@ -157,7 +287,7 @@ export function ResumeSuggestions() {
               ))}
             </select>
           </div>
-          <Button onClick={handleScan} isLoading={loading} disabled={loading} className="sm:shrink-0">
+          <Button onClick={() => handleScan(false)} isLoading={loading} disabled={loading} className="sm:shrink-0">
             {!loading && <Sparkles className="w-4 h-4 mr-1.5" aria-hidden="true" />}
             {loading ? 'Scanning…' : 'Scan resume & suggest roles'}
           </Button>
@@ -171,6 +301,19 @@ export function ResumeSuggestions() {
           <code>portals.yml</code> <code>title_filter.positive</code> to widen your next scan.
         </p>
       </div>
+
+      {/* Background scan indicator (persists across tab switches) */}
+      {isScanningInBackground && !loading && (
+        <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20 p-4 flex items-center gap-3 animate-in">
+          <Loader2 className="w-5 h-5 animate-spin text-primary-500 flex-shrink-0" />
+          <div className="text-sm text-primary-900 dark:text-primary-100">
+            <p className="font-medium">Scan running in background…</p>
+            <p className="mt-1 text-xs text-primary-700 dark:text-primary-300">
+              You can switch tabs — the scan will continue and results will appear here when ready.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
@@ -243,7 +386,7 @@ export function ResumeSuggestions() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleCopyKeyword(s.keyword)}
+                          onClick={() => handleRefer(s)}
                           disabled={loading}
                         >
                           {copied === s.keyword ? (
@@ -253,8 +396,8 @@ export function ResumeSuggestions() {
                             </>
                           ) : (
                             <>
-                              <Copy className="w-4 h-4 mr-1.5" />
-                              Copy keyword
+                              <Share2 className="w-4 h-4 mr-1.5" />
+                              Refer
                             </>
                           )}
                         </Button>
@@ -282,7 +425,18 @@ export function ResumeSuggestions() {
 
                     {/* Real US postings for this role, with official apply links. */}
                     {jobsOpen && (
-                      <SuggestionJobList keyword={s.keyword} resumeId={selectedResumeId || undefined} />
+                      <SuggestionJobList
+                        keyword={s.keyword}
+                        resumeId={selectedResumeId || undefined}
+                        initialJobs={jobsCache.get(cacheKey(s.keyword, selectedResumeId)) || []}
+                        onJobsFetched={(jobs) => {
+                          setJobsCache((prev) => {
+                            const next = new Map(prev)
+                            next.set(cacheKey(s.keyword, selectedResumeId), jobs)
+                            return next
+                          })
+                        }}
+                      />
                     )}
                   </div>
                 )

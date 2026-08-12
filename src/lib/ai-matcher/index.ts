@@ -110,10 +110,26 @@ async function scoreWithAnthropic(
     throw new Error('Unexpected response type')
   }
 
-  const result = JSON.parse(textBlock.text)
+  let result = JSON.parse(textBlock.text)
 
   // Validate and clamp score
   result.score = Math.max(0, Math.min(100, Math.round(result.score)))
+
+  // Apply experience level penalty (same logic as heuristic scoring) to prevent
+  // senior/staff roles from outranking appropriate-level matches for junior candidates.
+  const levelPenalty = levelReachPenalty(resumeText, job.experienceLevel)
+  if (levelPenalty < 1) {
+    result.score = Math.round(result.score * levelPenalty)
+  }
+
+  // Also adjust reasoning to mention the seniority gap if penalized
+  if (levelPenalty < 1) {
+    const candidateLevel = inferCandidateLevel(resumeText)
+    const jobLevel = job.experienceLevel
+    const levelLabel = jobLevel
+    result.reasoning = (result.reasoning || '') + ` Seniority (${levelLabel}): above your level (${candidateLevel}) — score adjusted.`
+  }
+
   result.recommendation = result.recommendation || getRecommendation(result.score)
 
   return result

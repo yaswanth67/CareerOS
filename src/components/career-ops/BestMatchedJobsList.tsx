@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, ExternalLink, FileCheck, FileText, Loader2, MapPin, Star, Target, TrendingUp, X } from 'lucide-react'
+import { CheckCircle2, ExternalLink, FileCheck, FileText, Loader2, MapPin, Star, Target, TrendingUp, X, Briefcase } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { TailorResumeDrawer } from '@/components/dashboard/TailorResumeDrawer'
@@ -22,6 +22,7 @@ interface BestMatch {
     location?: string | null
     isRemote?: boolean
     applyUrl: string | null
+    applicationStatus?: string | null
   }
   resume?: { id: string; title: string; roleType: string } | null
 }
@@ -90,6 +91,18 @@ export function BestMatchedJobsList() {
       setLoading(false)
     }
   }, [selectedResumeId, threshold])
+
+  // Trigger scoring when resume filter changes (if not 'all')
+  useEffect(() => {
+    if (selectedResumeId !== 'all') {
+      // Fire and forget - score jobs against this resume
+      fetch('/api/matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeId: selectedResumeId }),
+      }).catch(() => {}) // Silently fail, matches will be fetched again on next render
+    }
+  }, [selectedResumeId])
 
   useEffect(() => {
     // Defer so setState isn't called synchronously inside the effect.
@@ -230,6 +243,12 @@ export function BestMatchedJobsList() {
                       <TrendingUp className="w-3 h-3" />
                       {match.score}% match
                     </span>
+                    {match.job.applicationStatus && (
+                      <Badge variant="gray" className="text-xs">
+                        <Briefcase className="w-3 h-3 mr-1" />
+                        {match.job.applicationStatus}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-primary-600 dark:text-primary-400 truncate">{match.job.company}</p>
                   {(match.job.location || match.job.isRemote) && (
@@ -255,18 +274,21 @@ export function BestMatchedJobsList() {
                     row reads as one clean, centered control strip. */}
                 <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2">
                   <Button
-                    variant="primary"
+                    variant={match.job.applicationStatus ? 'outline' : 'primary'}
                     size="sm"
                     className="flex-1"
                     onClick={() => handleSave(match)}
-                    disabled={savingId === match.id}
+                    disabled={savingId === match.id || Boolean(match.job.applicationStatus)}
+                    title={match.job.applicationStatus ? `Already ${match.job.applicationStatus.toLowerCase()} — track it under Applications` : 'Save to Applications'}
                   >
                     {savingId === match.id ? (
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : match.job.applicationStatus ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-success-500" />
                     ) : (
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                     )}
-                    {savingId === match.id ? 'Saving...' : 'Save'}
+                    {savingId === match.id ? 'Saving...' : match.job.applicationStatus ? 'Applied' : 'Save'}
                   </Button>
                   {match.job.applyUrl && (
                     <Button
@@ -277,7 +299,7 @@ export function BestMatchedJobsList() {
                       title="Open application page"
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-                      Open
+                      Apply
                     </Button>
                   )}
                   <Button
