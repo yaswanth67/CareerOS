@@ -16,7 +16,7 @@ Built with Next.js 16 (App Router), Prisma + SQLite, NextAuth, and the **Anthrop
 | 4 | **Filters** | Filter by keyword, **company** (autocomplete), role type, experience level (**New Grad** / Senior quick chips), location, **country**, remote-only, **posted within (24h / 48h / 7 days)**, status (All Jobs / Saved / Applied), **visa sponsorship**, and minimum match score. Feed shows the **newest jobs first**, paginated with a **Load More** button to browse all of them |
 | 5 | **Visa sponsorship (AI-detected)** | Every job is classified for visa sponsorship — a keyword pre-screen catches the obvious "we do / do not sponsor" statements, and **Claude AI** reads the rest. A green **Visa sponsorship** badge appears on confirmed sponsors, and the Sponsorship filter shows only those jobs |
 | 6 | **Dashboard** | Real stats (total jobs, active jobs for the selected country, strong matches) and a full-width vertical job feed. Country + filters **persist when switching tabs** |
-| 7 | **Preferences** | Target roles, locations, remote-only, visa requirement, min salary, excluded keywords |
+| 7 | **Target filters** | Save any number of named filters on the Preferences tab — target roles, preferred locations, excluded keywords, and work preferences (remote / sponsorship / min salary). The dashboard's **Advanced Filters** offers them as a dropdown; with none saved, that button takes you to Preferences to create one |
 | 8 | **Applications** | Save jobs, mark **Applied** (auto-tracked via the **"Have you applied?"** popup when you return from an apply link), move through the pipeline (SAVED → APPLIED → INTERVIEWING → OFFER / REJECTED), and add notes. **Applied jobs leave the All-Jobs feed** (still under the Applied filter) and can be reverted to "not applied" |
 | 9 | **Scheduled fetch** | `GET /api/cron/fetch-jobs` (protected by `CRON_SECRET`) re-fetches jobs idempotently, **auto-scores every user's jobs**, checks apply links, deactivates stale ones, and **classifies a batch of jobs for visa sponsorship** |
 
@@ -81,7 +81,7 @@ The flow:
 | 2 | Install dependencies | `npm install --include=dev` — dev deps **included**, even when the shell exports `NODE_ENV=production` |
 | 3 | Prisma client | `prisma generate` — generates the type-safe client from `prisma/schema.prisma` |
 | 4 | Database schema | `prisma db push` — creates the SQLite `dev.db` from the schema |
-| 5 | Seed data | `npm run db:seed` — idempotent sample user, preferences, resumes, jobs, matches, applications |
+| 5 | Seed data | `npm run db:seed` — idempotent sample user, target filter, jobs, matches, applications |
 | 6 | Career-ops workspace | Installs `./career-ops` (deps + modes) so the app's Career Ops features work out of the box |
 
 > **Career Ops extras:** the app itself doesn't need the Playwright browser — only the career-ops CLI's PDF flow does. Install it on demand with `cd career-ops && npx playwright install chromium`.
@@ -121,7 +121,7 @@ Both `npm install` and `npm run setup` end up running `scripts/setup.mjs` — a 
 2. **Dependency install** — `npm install --include=dev`. The `--include=dev` is deliberate: if your shell exports `NODE_ENV=production`, a plain `npm install` silently skips devDependencies (`prisma`, `tsx`, `typescript`, `tailwindcss`, …), which would break both the dev server and the seed step. This flag forces them in regardless.
 3. **Prisma client** — `npx prisma generate` produces `@prisma/client` from `prisma/schema.prisma` before anything touches the database.
 4. **Database schema** — `npx prisma db push` creates/updates the local SQLite file (`prisma/dev.db`). Because SQLite is a single file, there are no migration files to manage.
-5. **Seed** — `npm run db:seed` inserts the sample data (idempotent): the `buddy` account, preferences, sample resumes, jobs, matches, and applications.
+5. **Seed** — `npm run db:seed` inserts the sample data (idempotent): the `buddy` account, a sample target filter, jobs, matches, and applications. Resumes are uploaded by the user, never seeded.
 6. **Career-ops workspace** — ensures `./career-ops` exists and has its dependencies installed. This is the vendored tool the app's Career Ops features read their methodology from. See [The career-ops workspace](#the-career-ops-workspace).
 
 ### Two equivalent entry points
@@ -204,7 +204,7 @@ What to do:
 | `/dashboard` | Stats cards + full-width vertical job feed. Filters + country are URL-driven (`/dashboard?q=…&posted=48&country=United%20States`) so they survive tab switches and can be bookmarked/shared. Applied jobs are hidden from the feed |
 | `/resumes` | Your resumes with expandable details |
 | `/resumes/new` | Upload + AI-parse a resume (drag-and-drop) |
-| `/preferences` | Target roles, locations, remote, salary, exclusions |
+| `/preferences` | Target filters — create/edit/delete named filters (roles, locations, exclusions, work preferences) |
 | `/applications` | Everything you've saved or applied to — change status, add notes, remove |
 
 ---
@@ -260,11 +260,13 @@ Response shape: `{ jobs: [...], pagination: { page, pageSize, total, totalPages 
 | GET | `/api/resumes/[id]` | One resume |
 | DELETE | `/api/resumes/[id]` | Delete resume + its uploaded file |
 
-### Preferences
+### Target filters
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/preferences` | Current preferences (array fields normalized) |
-| PUT | `/api/preferences` | Update: `{targetRoles[], locations[], remoteOnly, visaRequired, minSalary, excludedKeywords[]}` |
+| GET | `/api/preferences` | `{filters: [...]}` — every saved target filter (array fields normalized) |
+| POST | `/api/preferences` | Create: `{name, targetRoles[], locations[], remoteOnly, visaRequired, minSalary, excludedKeywords[]}` — `name` is required |
+| PUT | `/api/preferences?id=` | Update one filter (same body as POST) |
+| DELETE | `/api/preferences?id=` | Delete one filter |
 
 ### Applications
 | Method | Endpoint | Description |
@@ -352,7 +354,7 @@ curl -X POST http://localhost:3000/api/matches \
 ```
 jobmatch-ai/
 ├── prisma/
-│   ├── schema.prisma          # 6 models: User, Resume, Preference, Job, Match, Application
+│   ├── schema.prisma          # 6 models: User, Resume, Preference (target filter), Job, Match, Application
 │   └── seed.ts                # Idempotent sample data (buddy@gmail.com / qwerty@1)
 ├── public/uploads/            # Uploaded resume files
 ├── src/
@@ -373,7 +375,7 @@ jobmatch-ai/
 │   │       ├── resumes/[id]/      # GET / PATCH / DELETE
 │   │       ├── applications/      # GET / POST
 │   │       ├── applications/[id]/ # PATCH status / DELETE
-│   │       ├── preferences/       # GET / PUT
+│   │       ├── preferences/       # Target filters: GET / POST / PUT?id / DELETE?id
 │   │       └── cron/fetch-jobs/   # Scheduled fetch + auto-score + link check (CRON_SECRET)
 │   ├── components/
 │   │   ├── dashboard/         # JobList, JobFilters, JobCard, StatsCards, DashboardHeader, skeletons

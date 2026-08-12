@@ -53,22 +53,18 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Also get application count for today
-    const applicationsToday = await prisma.application.count({
-      where: {
-        userId: user.id,
-        createdAt: {
-          gte: startOfDay(date),
-          lte: endOfDay(date),
-        },
-      },
-    })
+    // Applications are tracked automatically: every job marked APPLIED that day
+    // counts itself. Saved-but-not-applied jobs don't — they aren't applications.
+    const appliedToday = await countApplicationsApplied(user.id, date)
 
-    // Update completed count based on actual applications
-    if (applicationsToday !== dailyGoal.applicationsCompleted) {
+    // Manual nudges (applications sent outside MatchIQ) sit on top of the real
+    // count and can't drag the total below zero.
+    const completed = Math.max(0, appliedToday + dailyGoal.applicationsAdjustment)
+
+    if (completed !== dailyGoal.applicationsCompleted) {
       dailyGoal = await prisma.dailyGoal.update({
         where: { id: dailyGoal.id },
-        data: { applicationsCompleted: applicationsToday },
+        data: { applicationsCompleted: completed },
       })
     }
 
@@ -77,11 +73,30 @@ export async function GET(request: NextRequest) {
         ...dailyGoal,
         date: format(dailyGoal.date, 'yyyy-MM-dd'),
       },
+      // How much of the applications total came from real applications — the UI
+      // labels the auto-tracked portion so a manual nudge isn't a mystery.
+      applicationsAuto: appliedToday,
     })
   } catch (error) {
     console.error('Error fetching daily goal:', error)
     return NextResponse.json({ error: 'Failed to fetch daily goal' }, { status: 500 })
   }
+}
+
+/**
+ * Jobs the user actually applied to on `date`. Counts by `appliedAt` — the
+ * moment the apply happened — falling back to `createdAt` for APPLIED rows old
+ * enough to predate that column being set.
+ */
+async function countApplicationsApplied(userId: string, date: Date): Promise<number> {
+  const range = { gte: startOfDay(date), lte: endOfDay(date) }
+  return prisma.application.count({
+    where: {
+      userId,
+      status: 'APPLIED',
+      OR: [{ appliedAt: range }, { appliedAt: null, createdAt: range }],
+    },
+  })
 }
 
 async function calculateStreak(userId: string): Promise<number> {
@@ -208,103 +223,60 @@ export async function POST(request: NextRequest) {
 
     const targetDate = date ? parseLocalDate(date) : new Date()
 
-    // The client sends `increment-${type}` where skill learning's type is
-    // camelCase (`increment-skillLearning`). Normalize to the kebab-case the
-    // handlers below check against, so the button works for all three goals.
-    const normalizedAction = String(action ?? '').replace('skillLearning', 'skill-learning')
+    // Actions are `increment-<goal>` / `decrement-<goal>` where <goal> is
+    // applications | networking | skillLearning.
+    const match = /^(increment|decrement)-(applications|networking|skillLearning)$/.exec(String(action ?? ''))
+    if (!match) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+    const [, direction, goal] = match
+    const delta = direction === 'increment' ? 1 : -1
 
-    if (normalizedAction === 'increment-applications') {
+    const day = startOfDay(targetDate)
+    const existing = await prisma.dailyGoal.findUnique({
+      where: { userId_date: { userId: user.id, date: day } },
+    })
+
+    if (goal === 'applications') {
+      // Applications are auto-counted from real applies, so a manual nudge moves
+      // the adjustment instead — otherwise the next read would overwrite it.
+      const applied = await countApplicationsApplied(user.id, targetDate)
+      const adjustment = existing?.applicationsAdjustment ?? 0
+      // Never let the visible total go negative.
+      const nextAdjustment = Math.max(adjustment + delta, -applied)
+      const completed = Math.max(0, applied + nextAdjustment)
+
       const dailyGoal = await prisma.dailyGoal.upsert({
-        where: {
-          userId_date: {
-            userId: user.id,
-            date: startOfDay(targetDate),
-          },
-        },
-        update: {
-          applicationsCompleted: { increment: 1 },
-        },
+        where: { userId_date: { userId: user.id, date: day } },
+        update: { applicationsAdjustment: nextAdjustment, applicationsCompleted: completed },
         create: {
           userId: user.id,
-          date: startOfDay(targetDate),
-          applicationsTarget: 3,
-          applicationsCompleted: 1,
-          networkingTarget: 1,
-          networkingCompleted: 0,
-          skillLearningTarget: 1,
-          skillLearningCompleted: 0,
+          date: day,
+          applicationsAdjustment: nextAdjustment,
+          applicationsCompleted: completed,
         },
       })
 
       return NextResponse.json({
-        dailyGoal: {
-          ...dailyGoal,
-          date: format(dailyGoal.date, 'yyyy-MM-dd'),
-        },
+        dailyGoal: { ...dailyGoal, date: format(dailyGoal.date, 'yyyy-MM-dd') },
+        applicationsAuto: applied,
       })
     }
 
-    if (normalizedAction === 'increment-networking') {
-      const dailyGoal = await prisma.dailyGoal.upsert({
-        where: {
-          userId_date: {
-            userId: user.id,
-            date: startOfDay(targetDate),
-          },
-        },
-        update: {
-          networkingCompleted: { increment: 1 },
-        },
-        create: {
-          userId: user.id,
-          date: startOfDay(targetDate),
-          applicationsTarget: 3,
-          applicationsCompleted: 0,
-          networkingTarget: 1,
-          networkingCompleted: 1,
-          skillLearningTarget: 1,
-          skillLearningCompleted: 0,
-        },
-      })
+    const completedKey = goal === 'networking' ? 'networkingCompleted' : 'skillLearningCompleted'
+    const current = existing?.[completedKey] ?? 0
+    const next = Math.max(0, current + delta)
 
-      return NextResponse.json({
-        dailyGoal: {
-          ...dailyGoal,
-          date: format(dailyGoal.date, 'yyyy-MM-dd'),
-        },
-      })
-    }
+    const dailyGoal = await prisma.dailyGoal.upsert({
+      where: { userId_date: { userId: user.id, date: day } },
+      update: { [completedKey]: next },
+      create: { userId: user.id, date: day, [completedKey]: next },
+    })
 
-    if (normalizedAction === 'increment-skill-learning') {
-      const dailyGoal = await prisma.dailyGoal.upsert({
-        where: {
-          userId_date: {
-            userId: user.id,
-            date: startOfDay(targetDate),
-          },
-        },
-        update: {
-          skillLearningCompleted: { increment: 1 },
-        },
-        create: {
-          userId: user.id,
-          date: startOfDay(targetDate),
-          applicationsTarget: 3,
-          applicationsCompleted: 0,
-          networkingTarget: 1,
-          networkingCompleted: 0,
-          skillLearningTarget: 1,
-          skillLearningCompleted: 1,
-        },
-      })
-
-      return NextResponse.json({
-        dailyGoal: {
-          ...dailyGoal,
-          date: format(dailyGoal.date, 'yyyy-MM-dd'),
-        },
-      })
-    }
+    return NextResponse.json({
+      dailyGoal: { ...dailyGoal, date: format(dailyGoal.date, 'yyyy-MM-dd') },
+      applicationsAuto: await countApplicationsApplied(user.id, targetDate),
+    })
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error) {

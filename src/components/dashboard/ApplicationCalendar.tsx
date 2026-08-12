@@ -5,6 +5,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { format, addMonths, subMonths } from 'date-fns'
 import { cn } from '@/lib/utils'
 
+// The API sends day keys as `yyyy-MM-dd`. `new Date('2026-08-12')` parses that
+// as UTC midnight, which lands on the *previous* local day in any negative-offset
+// timezone — clicking Aug 12 rendered the heading "Tuesday, August 11". Parse it
+// as a local midnight instead. Mirrors parseLocalDate in the daily-goals route.
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, (month || 1) - 1, day || 1)
+}
+
 interface ApplicationCalendarProps {
   year?: number
   month?: number
@@ -174,6 +183,56 @@ export function ApplicationCalendar({ year: initialYear, month: initialMonth, on
         </div>
       </div>
 
+      {/* Monthly summary + intensity legend. Above the grid so the month's
+          numbers and the dot key are read before the days they describe —
+          below the grid they sat under the fold once a day was selected. */}
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {(['SAVED', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'WITHDRAWN'] as const).map(status => {
+            const count = calendarData.summary[status] || 0
+            if (count === 0) return null
+            return (
+              <span
+                key={status}
+                className={cn(
+                  'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
+                  STATUS_COLORS[status] + '/20 text-' + STATUS_COLORS[status].replace('bg-', '') + '-700 dark:text-' + STATUS_COLORS[status].replace('bg-', '') + '-300'
+                )}
+              >
+                <span className="text-base">{STATUS_EMOJIS[status]}</span>
+                {STATUS_LABELS[status]}: {count}
+              </span>
+            )
+          })}
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Total this month: <span className="font-medium text-gray-900 dark:text-white">{calendarData.summary.total}</span>
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" />
+            <span>No activity</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-green-100 dark:bg-green-900/30" />
+            <span>1</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-green-200 dark:bg-green-900/50" />
+            <span>2</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-green-300 dark:bg-green-900/70" />
+            <span>3</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-green-400 dark:bg-green-900" />
+            <span>4+</span>
+          </div>
+        </div>
+      </div>
+
       {/* Calendar Grid */}
       <div className="p-4">
         {/* Weekday headers */}
@@ -239,37 +298,12 @@ export function ApplicationCalendar({ year: initialYear, month: initialMonth, on
         </div>
       </div>
 
-      {/* Monthly Summary */}
-      <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex flex-wrap gap-2 justify-center">
-          {(['SAVED', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'WITHDRAWN'] as const).map(status => {
-            const count = calendarData.summary[status] || 0
-            if (count === 0) return null
-            return (
-              <span
-                key={status}
-                className={cn(
-                  'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
-                  STATUS_COLORS[status] + '/20 text-' + STATUS_COLORS[status].replace('bg-', '') + '-700 dark:text-' + STATUS_COLORS[status].replace('bg-', '') + '-300'
-                )}
-              >
-                <span className="text-base">{STATUS_EMOJIS[status]}</span>
-                {STATUS_LABELS[status]}: {count}
-              </span>
-            )
-          })}
-        </div>
-        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Total applications this month: <span className="font-medium text-gray-900 dark:text-white">{calendarData.summary.total}</span>
-        </p>
-      </div>
-
       {/* Selected Day Details */}
       {selectedDate && selectedApps.length > 0 && (
         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-medium text-gray-900 dark:text-white">
-              {format(new Date(selectedDate), 'EEEE, MMMM d, yyyy')}
+              {format(parseLocalDate(selectedDate), 'EEEE, MMMM d, yyyy')}
             </h3>
             <button
               onClick={() => { setSelectedDate(null); setSelectedApps([]) }}
@@ -303,32 +337,6 @@ export function ApplicationCalendar({ year: initialYear, month: initialMonth, on
           </div>
         </div>
       )}
-
-      {/* Legend */}
-      <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" />
-            <span>No activity</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-green-100 dark:bg-green-900/30" />
-            <span>1</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-green-200 dark:bg-green-900/50" />
-            <span>2</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-green-300 dark:bg-green-900/70" />
-            <span>3</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-green-400 dark:bg-green-900" />
-            <span>4+</span>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

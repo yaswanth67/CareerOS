@@ -273,7 +273,7 @@ export function BestMatchedJobsList() {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => window.open(match.job.applyUrl, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(match.job.applyUrl ?? '', '_blank', 'noopener,noreferrer')}
                       title="Open application page"
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />

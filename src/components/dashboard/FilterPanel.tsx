@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck } from 'lucide-react'
+import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck, Ban, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { RoleType, AppStatus } from '@/types'
 import { useToast } from '@/components/ui/Toast'
+import type { TargetFilter } from './useTargetFilters'
 
 export const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'SDE', label: 'Software Engineer' },
@@ -51,9 +53,16 @@ export const statusOptions: { value: AppStatus | ''; label: string; icon?: React
 ]
 
 interface Filters {
+  /** Id of the saved target filter driving this view ('' = none selected). */
+  filter: string
   q: string
   roles: RoleType[]
   loc: string
+  /** Preferred locations from the selected target filter (OR-matched). */
+  locs: string[]
+  /** Excluded keywords from the selected target filter. */
+  exclude: string[]
+  salary: string
   remote: boolean
   score: string
   posted: string
@@ -64,14 +73,20 @@ interface Filters {
 interface FilterPanelProps {
   isOpen: boolean
   onClose: () => void
+  /** Saved target filters from the Preferences tab. */
+  targetFilters: TargetFilter[]
 }
 
 function readParams(searchParams: URLSearchParams): Filters {
   const status = searchParams.get('status') || ''
   return {
+    filter: searchParams.get('filter') || '',
     q: searchParams.get('q') || '',
     roles: (searchParams.get('roles')?.split(',').filter(Boolean) as RoleType[]) || [],
     loc: searchParams.get('loc') || '',
+    locs: searchParams.get('locs')?.split(',').filter(Boolean) || [],
+    exclude: searchParams.get('exclude')?.split(',').filter(Boolean) || [],
+    salary: searchParams.get('salary') || '',
     remote: searchParams.get('remote') === '1',
     score: searchParams.get('score') || '0',
     posted: searchParams.get('posted') || '',
@@ -82,9 +97,13 @@ function readParams(searchParams: URLSearchParams): Filters {
 
 function toQuery(f: Filters): string {
   const params = new URLSearchParams()
+  if (f.filter) params.set('filter', f.filter)
   if (f.q.trim()) params.set('q', f.q.trim())
   if (f.roles.length) params.set('roles', f.roles.join(','))
   if (f.loc.trim()) params.set('loc', f.loc.trim())
+  if (f.locs.length) params.set('locs', f.locs.join(','))
+  if (f.exclude.length) params.set('exclude', f.exclude.join(','))
+  if (f.salary) params.set('salary', f.salary)
   if (f.remote) params.set('remote', '1')
   if (f.score && f.score !== '0') params.set('score', f.score)
   if (f.posted) params.set('posted', f.posted)
@@ -94,7 +113,7 @@ function toQuery(f: Filters): string {
   return s ? `?${s}` : ''
 }
 
-export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
+export function FilterPanel({ isOpen, onClose, targetFilters }: FilterPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [filters, setFilters] = useState<Filters>(() => readParams(new URLSearchParams(searchParams.toString())))
@@ -104,8 +123,12 @@ export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
   const { toast } = useToast()
 
   const activeFiltersCount =
+    (filters.filter ? 1 : 0) +
     filters.roles.length +
     (filters.loc ? 1 : 0) +
+    filters.locs.length +
+    filters.exclude.length +
+    (filters.salary ? 1 : 0) +
     (filters.remote ? 1 : 0) +
     (filters.score !== '0' ? 1 : 0) +
     (filters.posted ? 1 : 0) +
@@ -131,10 +154,36 @@ export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
     commit({ ...filters, q: searchInput, loc: locationInput })
   }
 
+  // Selecting a saved target filter replaces every criterion it owns (roles,
+  // locations, excluded keywords, work preferences) and records its id, so
+  // scoring knows which resume to use. Free-text search, status and "posted
+  // within" are left alone — they're per-session, not part of the filter.
+  const selectTargetFilter = (id: string) => {
+    const target = targetFilters.find(f => f.id === id)
+    if (!target) {
+      commit({
+        ...filters,
+        filter: '', roles: [], locs: [], exclude: [], salary: '',
+        remote: false, sponsorship: false,
+      })
+      return
+    }
+    commit({
+      ...filters,
+      filter: target.id,
+      roles: target.targetRoles,
+      locs: target.locations,
+      exclude: target.excludedKeywords,
+      salary: target.minSalary != null ? String(target.minSalary) : '',
+      remote: target.remoteOnly,
+      sponsorship: target.visaRequired,
+    })
+  }
+
   const clearAllFilters = () => {
     const empty: Filters = {
-      q: '', roles: [], loc: '', remote: false, score: '0', posted: '', status: '',
-      sponsorship: false,
+      filter: '', q: '', roles: [], loc: '', locs: [], exclude: [], salary: '',
+      remote: false, score: '0', posted: '', status: '', sponsorship: false,
     }
     commit(empty)
   }
@@ -200,6 +249,86 @@ export function FilterPanel({ isOpen, onClose }: FilterPanelProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Saved target filters — the criteria live in the Preferences tab,
+              and picking one here applies them all at once. */}
+          <div className="rounded-lg border border-primary-200 dark:border-primary-900/60 bg-primary-50/60 dark:bg-primary-900/10 p-3">
+            <label className="label flex items-center gap-1.5" htmlFor="targetFilter">
+              <Target className="w-4 h-4" />
+              Target Filter
+            </label>
+            <select
+              id="targetFilter"
+              value={filters.filter}
+              onChange={(e) => selectTargetFilter(e.target.value)}
+              className="input mt-1"
+            >
+              <option value="">No filter — all jobs</option>
+              {targetFilters.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Applies the filter&apos;s roles, locations, exclusions and work preferences to the feed
+            </p>
+            <Link
+              href="/preferences"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Manage filters
+            </Link>
+          </div>
+
+          {/* Criteria carried by the selected filter, shown read-only so it's
+              clear where the narrowing comes from. */}
+          {(filters.locs.length > 0 || filters.exclude.length > 0 || filters.salary) && (
+            <div className="space-y-3">
+              {filters.locs.length > 0 && (
+                <div>
+                  <label className="label flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4" />
+                    Preferred Locations
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {filters.locs.map((loc) => (
+                      <span key={loc} className="badge bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                        {loc}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {filters.exclude.length > 0 && (
+                <div>
+                  <label className="label flex items-center gap-1.5">
+                    <Ban className="w-4 h-4" />
+                    Excluded Keywords
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {filters.exclude.map((kw) => (
+                      <span key={kw} className="badge bg-danger-50 text-danger-600 dark:bg-danger-500/10 dark:text-danger-400">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {filters.salary && (
+                <div>
+                  <label className="label flex items-center gap-1.5">
+                    <Target className="w-4 h-4" />
+                    Minimum Salary
+                  </label>
+                  <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                    ${Number(filters.salary).toLocaleString()}+
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Search */}
           <div>
             <label className="label flex items-center gap-1.5">
