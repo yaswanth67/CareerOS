@@ -78,8 +78,10 @@ export function OnboardingFlow({ hasResume, nextPath }: OnboardingFlowProps) {
 
             if (event.type === 'phase') {
               setStatus(event.phase ?? 'fetch')
-              if (event.phase === 'fetch' && event.provider) {
-                setProviders((prev) => (prev.includes(event.provider) ? prev : [...prev, event.provider]))
+              // Bound to a local so the narrowing survives into the closure.
+              const provider = event.provider
+              if (event.phase === 'fetch' && provider) {
+                setProviders((prev) => (prev.includes(provider) ? prev : [...prev, provider]))
               }
             } else if (event.type === 'error') {
               finished = true

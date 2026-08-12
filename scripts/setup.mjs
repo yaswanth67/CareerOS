@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-command first-run setup for JobMatch AI.
+ * One-command first-run setup for Prose.
  *
  * Installs everything — app dependencies, the SQLite database, and the
  * career-ops workspace — from a single command. Safe to re-run (idempotent):

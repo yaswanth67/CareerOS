@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Target, Users, BookOpen, CheckCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { Target, Users, BookOpen, CheckCircle, ChevronLeft, ChevronRight, RefreshCw, Minus, Plus, Zap } from 'lucide-react'
 import { format, subDays, addDays, startOfDay, isSameDay } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
@@ -16,6 +16,8 @@ interface DailyGoal {
   skillLearningTarget: number
   skillLearningCompleted: number
 }
+
+type GoalKey = 'applications' | 'networking' | 'skillLearning'
 
 interface DailyGoalTrackerProps {
   initialDate?: Date
@@ -51,66 +53,70 @@ const GOAL_TYPES = [
   },
 ] as const
 
-const COLOR_CLASSES: Record<string, { bg: string; text: string; border: string; ring: string }> = {
-  blue: { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800', ring: 'focus:ring-blue-500' },
-  green: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-800', ring: 'focus:ring-green-500' },
-  purple: { bg: 'bg-purple-50 dark:bg-purple-900/20', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800', ring: 'focus:ring-purple-500' },
-}
-
-function ProgressRing({
-  progress,
-  size = 60,
-  strokeWidth = 6,
-  color = 'blue',
-}: {
-  progress: number
-  size?: number
-  strokeWidth?: number
-  color?: string
-}) {
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-  const offset = circumference - (progress / 100) * circumference
-
-  const colorClasses: Record<string, string> = {
-    blue: 'stroke-blue-500',
-    green: 'stroke-green-500',
-    purple: 'stroke-purple-500',
-    orange: 'stroke-orange-500',
-    red: 'stroke-red-500',
-  }
-
-  return (
-    <svg width={size} height={size} className="transform -rotate-90">
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strokeWidth}
-        className={cn('text-gray-200 dark:text-gray-700', colorClasses[color] || 'stroke-blue-500')}
-        style={{ strokeDasharray: circumference, strokeDashoffset: offset, transition: 'stroke-dashoffset 0.5s ease' }}
-      />
-    </svg>
-  )
+// Every class here is a literal string: Tailwind only generates what it can see
+// in the source. Building names at runtime (`colors.text.replace('text-','bg-')`)
+// produced `bg-purple-700`, which was never compiled — the progress bar fill
+// rendered with no background and looked broken.
+const COLOR_CLASSES: Record<string, {
+  bg: string
+  chip: string
+  text: string
+  fill: string
+  border: string
+  ring: string
+}> = {
+  blue: {
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    chip: 'bg-blue-100 dark:bg-blue-900/30',
+    text: 'text-blue-700 dark:text-blue-300',
+    fill: 'bg-blue-500',
+    border: 'border-blue-200 dark:border-blue-800',
+    ring: 'focus:ring-blue-500',
+  },
+  green: {
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    chip: 'bg-green-100 dark:bg-green-900/30',
+    text: 'text-green-700 dark:text-green-300',
+    fill: 'bg-green-500',
+    border: 'border-green-200 dark:border-green-800',
+    ring: 'focus:ring-green-500',
+  },
+  purple: {
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    chip: 'bg-purple-100 dark:bg-purple-900/30',
+    text: 'text-purple-700 dark:text-purple-300',
+    fill: 'bg-purple-500',
+    border: 'border-purple-200 dark:border-purple-800',
+    ring: 'focus:ring-purple-500',
+  },
 }
 
 function GoalCard({
   goal,
   dailyGoal,
-  onIncrement,
+  onAdjust,
   onUpdateTarget,
+  autoCount,
+  busy,
 }: {
   goal: typeof GOAL_TYPES[number]
   dailyGoal: DailyGoal
-  onIncrement: (type: 'applications' | 'networking' | 'skillLearning') => void
-  onUpdateTarget: (type: 'applications' | 'networking' | 'skillLearning', value: number) => void
+  onAdjust: (type: GoalKey, delta: 1 | -1) => void
+  onUpdateTarget: (type: GoalKey, value: number) => void
+  /** Applications counted automatically from real applies (applications only). */
+  autoCount?: number
+  busy?: boolean
 }) {
   const target = dailyGoal[goal.targetKey]
   const completed = dailyGoal[goal.completedKey]
-  const progress = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0
-  const isComplete = completed >= target && target > 0
+  const isAutoTracked = goal.key === 'applications'
+  // A target of 0 means "not tracking this today" rather than "impossible goal":
+  // without this the card read "0 more to go" at 0% while showing 2 done.
+  const hasTarget = target > 0
+  const progress = hasTarget
+    ? Math.min(100, Math.round((completed / target) * 100))
+    : completed > 0 ? 100 : 0
+  const isComplete = hasTarget ? completed >= target : completed > 0
   const remaining = Math.max(0, target - completed)
 
   const Icon = goal.icon
@@ -118,51 +124,56 @@ function GoalCard({
 
   return (
     <div className={cn('card p-4 relative overflow-hidden', colors.bg, colors.border)}>
-      {/* Emoji indicator */}
-      <div className="absolute top-3 right-3 text-3xl opacity-20">
-        {goal.emoji}
-      </div>
-
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 relative z-10">
-          <div className={cn('p-2.5 rounded-xl', colors.bg.replace('50', '100').replace('20', '30'), colors.text)}>
+        <div className="flex items-center gap-3 min-w-0 relative z-10">
+          <div className={cn('p-2.5 rounded-xl shrink-0', colors.chip, colors.text)}>
             <Icon className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">{goal.label}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isComplete ? 'Goal achieved! 🎉' : `${remaining} more to go`}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                {goal.label} <span className="opacity-60">{goal.emoji}</span>
+              </h3>
+              {isAutoTracked && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                  title={`${autoCount ?? 0} counted automatically from jobs you marked Applied today`}
+                >
+                  <Zap className="w-2.5 h-2.5" />
+                  Auto
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+              {!hasTarget
+                ? 'No target set for today'
+                : isComplete
+                  ? 'Goal achieved! 🎉'
+                  : `${remaining} more to go`}
             </p>
           </div>
         </div>
 
-        {/* Progress Ring */}
-        <div className="relative flex-shrink-0">
-          <ProgressRing
-            progress={progress}
-            size={56}
-            strokeWidth={5}
-            color={isComplete ? 'green' : goal.color}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className={cn('text-lg font-bold', isComplete ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white')}>
-              {progress}%
-            </span>
-          </div>
-        </div>
+        {/* Percentage sits opposite the goal name — the count itself lives in
+            the stepper below, so this is the only progress figure up here. */}
+        <span
+          className={cn(
+            'text-xl font-bold leading-none tabular-nums shrink-0',
+            isComplete ? 'text-green-600 dark:text-green-400' : colors.text
+          )}
+        >
+          {hasTarget ? `${progress}%` : `${completed}`}
+        </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="mt-4 relative z-10">
-        <div className="flex items-center justify-between text-xs mb-1">
-          <span className={cn('font-medium', colors.text)}>{completed} / {target}</span>
-          <span className="text-gray-500 dark:text-gray-400">{isComplete ? '✓ Complete' : `${progress}%`}</span>
-        </div>
+      {/* Progress bar. No count/percentage labels — the stepper shows the count,
+          the target field shows the target, and the percentage is up top. */}
+      <div className="mt-3 relative z-10">
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
             className={cn(
               'h-full rounded-full transition-all duration-500',
-              isComplete ? 'bg-green-500' : colors.text.replace('text-', 'bg-')
+              isComplete ? 'bg-green-500' : colors.fill
             )}
             style={{ width: `${progress}%` }}
           />
@@ -170,33 +181,45 @@ function GoalCard({
       </div>
 
       {/* Controls */}
-      <div className="mt-3 flex items-center justify-between gap-2 relative z-10">
-        <button
-          onClick={() => onIncrement(goal.key)}
-          disabled={isComplete}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-            isComplete
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 cursor-not-allowed'
-              : `${colors.bg.replace('50', '100').replace('20', '30')} ${colors.text} hover:${colors.bg.replace('50', '200').replace('20', '40')}`
-          )}
-          aria-label={isComplete ? `${goal.label} goal completed` : `Increment ${goal.label.toLowerCase()}`}
-        >
-          {isComplete ? (
-            <>
-              <CheckCircle className="w-4 h-4" />
-              Done
-            </>
-          ) : (
-            <>
-              <span className="text-lg">{goal.emoji}</span>
-              <span className="hidden sm:inline">+1</span>
-            </>
-          )}
-        </button>
+      <div className="mt-3 flex items-center justify-between gap-3 relative z-10">
+        {/* Stepper. Applications count themselves as you apply; these nudge the
+            total for anything done outside Prose. */}
+        <div className={cn(
+          'flex items-center rounded-lg border bg-white dark:bg-gray-900/60 overflow-hidden',
+          colors.border
+        )}>
+          <button
+            onClick={() => onAdjust(goal.key, -1)}
+            disabled={busy || completed <= 0}
+            className="px-2.5 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label={`Remove one from ${goal.label.toLowerCase()}`}
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <span
+            className={cn('min-w-[2.5rem] text-center text-sm font-semibold tabular-nums', colors.text)}
+            aria-live="polite"
+          >
+            {completed}
+          </span>
+          <button
+            onClick={() => onAdjust(goal.key, 1)}
+            disabled={busy}
+            className="px-2.5 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label={`Add one to ${goal.label.toLowerCase()}`}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
 
-        <div className="flex items-center gap-1.5">
-          <label htmlFor={`target-${goal.key}`} className="sr-only">
+        <div className="flex items-center gap-2">
+          {isComplete && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Done
+            </span>
+          )}
+          <label htmlFor={`target-${goal.key}`} className="text-xs text-gray-500 dark:text-gray-400">
             Target
           </label>
           <input
@@ -207,14 +230,14 @@ function GoalCard({
             value={target}
             onChange={(e) => onUpdateTarget(goal.key, parseInt(e.target.value) || 0)}
             className={cn(
-              'w-16 px-2 py-1.5 text-center text-sm border rounded-lg bg-white dark:bg-gray-800',
+              'w-14 px-2 py-1.5 text-center text-sm font-medium border rounded-lg bg-white dark:bg-gray-900/60',
+              'focus:outline-none focus:ring-2',
               colors.border,
               colors.text,
               colors.ring
             )}
             aria-label={`${goal.label} target`}
           />
-          <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">target</span>
         </div>
       </div>
     </div>
@@ -224,6 +247,8 @@ function GoalCard({
 export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
   const [currentDate, setCurrentDate] = useState(() => initialDate ? startOfDay(initialDate) : startOfDay(new Date()))
   const [dailyGoal, setDailyGoal] = useState<DailyGoal | null>(null)
+  // Applications counted from real applies — shown as the "Auto" hint.
+  const [applicationsAuto, setApplicationsAuto] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [streak, setStreak] = useState(0)
@@ -236,6 +261,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
       const data = await res.json()
       if (res.ok && data.dailyGoal) {
         setDailyGoal(data.dailyGoal)
+        setApplicationsAuto(data.applicationsAuto ?? 0)
       }
     } catch (error) {
       console.error('Failed to fetch daily goal:', error)
@@ -266,9 +292,11 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate])
 
-  const handleIncrement = async (type: 'applications' | 'networking' | 'skillLearning') => {
+  // Manual nudge in either direction. Applications also count themselves as you
+  // mark jobs Applied, so this adjusts on top of that rather than replacing it.
+  const handleAdjust = async (type: GoalKey, delta: 1 | -1) => {
     if (!dailyGoal) return
-    if (dailyGoal[`${type}Completed`] >= dailyGoal[`${type}Target`] && dailyGoal[`${type}Target`] > 0) return
+    if (delta === -1 && dailyGoal[`${type}Completed`] <= 0) return
 
     setSaving(true)
     try {
@@ -276,12 +304,15 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
       const res = await fetch('/api/daily-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: `increment-${type}`, date: dateStr }),
+        body: JSON.stringify({
+          action: `${delta === 1 ? 'increment' : 'decrement'}-${type}`,
+          date: dateStr,
+        }),
       })
       const data = await res.json()
       if (res.ok && data.dailyGoal) {
         setDailyGoal(data.dailyGoal)
-        toast({ type: 'success', message: `${type.charAt(0).toUpperCase() + type.slice(1)} progress updated!` })
+        setApplicationsAuto(data.applicationsAuto ?? 0)
         fetchStreak()
       } else {
         toast({ type: 'error', message: 'Failed to update progress' })
@@ -293,7 +324,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
     }
   }
 
-  const handleUpdateTarget = async (type: 'applications' | 'networking' | 'skillLearning', value: number) => {
+  const handleUpdateTarget = async (type: GoalKey, value: number) => {
     if (!dailyGoal) return
 
     const dateStr = format(currentDate, 'yyyy-MM-dd')
@@ -342,7 +373,9 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
 
   const totalTarget = dailyGoal.applicationsTarget + dailyGoal.networkingTarget + dailyGoal.skillLearningTarget
   const totalCompleted = dailyGoal.applicationsCompleted + dailyGoal.networkingCompleted + dailyGoal.skillLearningCompleted
-  const overallProgress = totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0
+  // Capped at 100: overshooting one goal (3 applies against a target of 1) used
+  // to render "129%" and a bar that ran past its track.
+  const overallProgress = totalTarget > 0 ? Math.min(100, Math.round((totalCompleted / totalTarget) * 100)) : 0
   const allComplete = dailyGoal.applicationsCompleted >= dailyGoal.applicationsTarget &&
     dailyGoal.networkingCompleted >= dailyGoal.networkingTarget &&
     dailyGoal.skillLearningCompleted >= dailyGoal.skillLearningTarget
@@ -427,7 +460,9 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
             key={goal.key}
             goal={goal}
             dailyGoal={dailyGoal}
-            onIncrement={handleIncrement}
+            onAdjust={handleAdjust}
+            autoCount={goal.key === 'applications' ? applicationsAuto : undefined}
+            busy={saving}
             onUpdateTarget={handleUpdateTarget}
           />
         ))}

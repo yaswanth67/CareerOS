@@ -22,22 +22,24 @@ async function main() {
 
   console.log('Created user:', user.name)
 
-  // Create preferences
-  await prisma.preference.upsert({
-    where: { userId: user.id },
-    update: {},
-    create: {
-      userId: user.id,
-      targetRoles: JSON.stringify(['SDE', 'AI_ENGINEER', 'FULLSTACK']),
-      locations: JSON.stringify(['San Francisco', 'New York', 'Remote']),
-      remoteOnly: false,
-      visaRequired: false,
-      minSalary: 100000,
-      excludedKeywords: JSON.stringify(['senior', 'lead', 'principal', 'manager']),
-    },
-  })
-
-  console.log('Created preferences')
+  // Create a sample target filter. Users can have several, so this is seeded
+  // only when the account has none — re-seeding never piles up duplicates.
+  const existingFilters = await prisma.preference.count({ where: { userId: user.id } })
+  if (existingFilters === 0) {
+    await prisma.preference.create({
+      data: {
+        userId: user.id,
+        name: 'Software & AI roles',
+        targetRoles: JSON.stringify(['SDE', 'AI_ENGINEER', 'FULLSTACK']),
+        locations: JSON.stringify(['San Francisco', 'New York', 'Remote']),
+        remoteOnly: false,
+        visaRequired: false,
+        minSalary: 100000,
+        excludedKeywords: JSON.stringify(['senior', 'lead', 'principal', 'manager']),
+      },
+    })
+    console.log('Created sample target filter')
+  }
 
   // No sample resumes — the Resumes page should only show real user uploads.
   // (Sample jobs below still populate the feed; matches are scored after the

@@ -8,7 +8,7 @@ import { useSession } from 'next-auth/react'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import { AppStatus } from '@/types'
-import { FilterTrigger, FilterPanel } from './FilterPanel'
+import { AdvancedFilters } from './AdvancedFilters'
 
 export function DashboardHeader() {
   const { data: session } = useSession()
@@ -16,7 +16,6 @@ export function DashboardHeader() {
   const searchParams = useSearchParams()
   const [refreshing, setRefreshing] = useState(false)
   const [scoring, setScoring] = useState(false)
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const { toast } = useToast()
 
   const currentStatus = (searchParams.get('status') || '') as AppStatus | ''
@@ -131,18 +130,10 @@ export function DashboardHeader() {
               )
             })}
 
-            {/* Advanced Filters Trigger */}
-            <FilterTrigger
-              isOpen={showAdvancedFilters}
-              onClick={() => setShowAdvancedFilters(true)}
-            />
+            {/* Advanced Filters — trigger + drawer, built from saved target
+                filters (Preferences tab) */}
+            <AdvancedFilters />
           </div>
-
-          {/* Advanced Filters Panel */}
-          <FilterPanel
-            isOpen={showAdvancedFilters}
-            onClose={() => setShowAdvancedFilters(false)}
-          />
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             <Link href="/resumes/new" className="btn-primary">
