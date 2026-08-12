@@ -10,7 +10,7 @@ export default async function BestMatchesPage() {
   if (!user) redirect('/auth/signin')
 
   return (
-    <div className="space-y-6 animate-in max-w-3xl">
+    <div className="space-y-6 animate-in">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <Star className="w-6 h-6 text-primary-500" aria-hidden="true" />

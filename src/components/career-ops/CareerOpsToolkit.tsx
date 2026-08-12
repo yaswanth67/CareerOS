@@ -10,6 +10,7 @@ import {
   FileText,
   GraduationCap,
   Loader2,
+  MessageCircle,
   Mail,
   MessageSquare,
   Send,
@@ -59,6 +60,7 @@ type ModeId =
   | 'resume'
   | 'cover'
   | 'email'
+  | 'linkedin'
   | 'interview'
   | 'followup'
   | 'upskill'
@@ -130,6 +132,20 @@ const MODES: ModeDef[] = [
       variant,
     }),
     file: 'email',
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn message',
+    icon: MessageCircle,
+    blurb: 'Short, first-person outreach — an InMail/connection note to the recruiter or hiring manager.',
+    endpoint: () => '/api/career-ops/email',
+    resultKey: 'email',
+    body: (job, resumeId) => ({
+      jobId: job.id,
+      resumeId: resumeId || undefined,
+      variant: 'linkedin_message',
+    }),
+    file: 'linkedin-message',
   },
   {
     id: 'interview',
