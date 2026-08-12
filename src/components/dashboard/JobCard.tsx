@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ExternalLink, CheckCircle2, Clock, Loader2, MapPin, Building2, DollarSign, Star, Target, X, ShieldCheck, Eye, FileText } from 'lucide-react'
+import { ArrowRight, Building2, CheckCircle2, Clock, DollarSign, ExternalLink, FileText, Loader2, MapPin, ShieldCheck, Sparkles, Star, Target, X } from 'lucide-react'
 import { formatRelativeTime, getScoreColor, getScoreLabel, getRoleLabel, getExperienceLabel } from '@/lib/utils'
 import { RoleType, ExperienceLevel } from '@/types'
 import { JobDetailDrawer } from './JobDetailDrawer'
 import { TailorResumeDrawer } from './TailorResumeDrawer'
+import { CareerOpsToolkit } from '@/components/career-ops/CareerOpsToolkit'
 import { useToast } from '@/components/ui/Toast'
 
 const STATUS_META: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' }> = {
@@ -71,6 +72,7 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
   const [showAppliedPrompt, setShowAppliedPrompt] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [tailorOpen, setTailorOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const score = job.match?.score || 0
   const hasMatch = !!job.match
 
@@ -337,23 +339,15 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDetailsOpen(true)}
-              className="flex-1 sm:flex-none"
-              title="Open full details, AI assists, and similar jobs"
-            >
-              <Eye className="w-3.5 h-3.5 mr-1.5" />
-              Details
-            </Button>
+          {/* Actions — every button flex-1 so the row reads as one clean,
+              centered strip that shares the card width evenly (2, 3, or 4
+              buttons depending on state), on mobile and desktop alike. */}
+          <div className="flex items-stretch gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
             <Button
               variant="outline"
               size="sm"
               onClick={handleApplyClick}
-              className="flex-1 sm:flex-none"
+              className="flex-1"
               disabled={!job.applyUrl}
               title={job.applyUrl ? 'Open application page' : 'No application link available'}
             >
@@ -364,7 +358,7 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
               variant="outline"
               size="sm"
               onClick={() => setTailorOpen(true)}
-              className="flex-1 sm:flex-none"
+              className="flex-1"
               title="Tailor your resume to this job"
             >
               <FileText className="w-3.5 h-3.5 mr-1.5" />
@@ -377,7 +371,7 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
                   size="sm"
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 sm:flex-none"
+                  className="flex-1"
                 >
                   {saving ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -393,7 +387,7 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
                 size="sm"
                 onClick={handleRevertApplied}
                 disabled={reverting}
-                className="flex-1 sm:flex-none"
+                className="flex-1"
                 title="Mark this job as not applied so it shows in the feed again"
               >
                 {reverting ? (
@@ -405,6 +399,26 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
               </Button>
             )}
           </div>
+
+          {/* Advanced AI tools — opens the full career-ops pipeline for this
+              job: fit report, tailored CV, cover letter, the email variants,
+              LinkedIn message, interview prep, follow-up, and upskill. */}
+          <button
+            type="button"
+            onClick={() => setToolsOpen(true)}
+            className="group mt-3 w-full rounded-lg border border-primary-200 bg-primary-50/60 px-4 py-2.5 text-left transition-colors hover:bg-primary-100/70 dark:border-primary-500/30 dark:bg-primary-500/10 dark:hover:bg-primary-500/20"
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary-500 dark:text-primary-400" aria-hidden="true" />
+              <span className="text-sm font-semibold text-primary-700 dark:text-primary-300">
+                Advanced AI tools
+              </span>
+              <ArrowRight className="w-4 h-4 ml-auto text-primary-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </span>
+            <span className="mt-0.5 block pl-6 text-xs text-gray-500 dark:text-gray-400">
+              Cover letter · Cold email · LinkedIn · Interview prep
+            </span>
+          </button>
         </CardContent>
       </Card>
 
@@ -470,6 +484,23 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
           job={job}
           defaultResumeId={defaultResumeId}
           onClose={() => setTailorOpen(false)}
+        />
+      )}
+
+      {/* Advanced AI tools drawer — the full career-ops toolkit for this job */}
+      {toolsOpen && (
+        <CareerOpsToolkit
+          job={{
+            id: job.id,
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            isRemote: job.isRemote,
+            applyUrl: job.applyUrl || null,
+            description: job.description,
+          }}
+          defaultResumeId={defaultResumeId}
+          onClose={() => setToolsOpen(false)}
         />
       )}
     </>

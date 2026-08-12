@@ -732,7 +732,7 @@ PANEL_INTEL: <extracted or "unknown">
   return { markdown, processOverview, audienceMap, panelIntel }
 }
 
-export type EmailVariant = 'hr_application' | 'referral_request' | 'cold_application' | 'process_stuck' | 'confirmed_time_noshow'
+export type EmailVariant = 'hr_application' | 'referral_request' | 'cold_application' | 'process_stuck' | 'confirmed_time_noshow' | 'linkedin_message'
 
 export interface EmailOptions {
   /** Email variant */
@@ -842,6 +842,12 @@ SUBJECT: <subject line>
   }
 
   userContent += `Follow the email.md mode exactly. Execute all steps for the ${variant} variant. Generate the full email draft.`
+
+  // A LinkedIn message is not a letter — force the shape so the result reads
+  // like a first touch in InMail rather than an email with a subject line.
+  if (variant === 'linkedin_message') {
+    userContent += `\n\nThis is a LinkedIn message, not an email: write in the first person, conversational but professional, no subject line, and keep it under 300 words. Address it as an InMail/connection note to the relevant recruiter or hiring manager.`
+  }
 
   let raw: string
   try {
