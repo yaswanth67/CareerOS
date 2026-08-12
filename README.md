@@ -62,15 +62,27 @@ Every AI feature constructs the Anthropic SDK client from `ANTHROPIC_AUTH_TOKEN 
 ### 1. One-command setup
 
 ```bash
+npm install
+```
+
+…or the explicit form (same thing):
+
+```bash
 npm run setup
 ```
 
-That single command does the whole first-run flow — it's safe to re-run:
+Both do the whole first-run flow — safe to re-run, every step is a no-op when already done. `npm install` triggers it automatically through its `postinstall` hook; `npm run setup` is the explicit version and is the one to use if your shell exports `NODE_ENV=production` (which makes plain `npm install` skip dev dependencies — `npm run setup` forces them with `--include=dev`).
+
+The flow:
 
 1. Creates your `.env` from the template (generates a fresh `NEXTAUTH_SECRET` and `CRON_SECRET`; skips it if `.env` already exists)
-2. Installs all dependencies — dev deps **included**, even if your shell exports `NODE_ENV=production`
-3. Creates the SQLite schema (`prisma db push`)
-4. Seeds sample data (`npm run db:seed`, idempotent)
+2. Installs all dependencies — dev deps **included**
+3. Generates the Prisma client (`prisma generate`)
+4. Creates the SQLite schema (`prisma db push`)
+5. Seeds sample data (`npm run db:seed`, idempotent)
+6. Installs the **career-ops workspace** (`./career-ops`) — its deps and modes — so the app's Career Ops features (evaluate, cover letter, interview prep, upskill, follow-up, tailor-resume) work out of the box. On a fresh clone the workspace is gitignored, so it bootstraps it via `npx @santifer/career-ops init`.
+
+> **Career Ops extras:** the app doesn't need the Playwright browser, but the career-ops CLI's PDF flow does — install it on demand with `cd career-ops && npx playwright install chromium`.
 
 ### 2. Run it
 
@@ -330,7 +342,8 @@ jobmatch-ai/
 ## Development commands
 
 ```bash
-npm run setup        # First-run setup: .env + install + schema + seed (one command)
+npm install          # Installs deps AND runs full setup via postinstall (.env + DB + career-ops)
+npm run setup        # First-run setup: .env + install + schema + seed + career-ops (one command)
 npm run dev          # Dev server (forces NODE_ENV=development, port 3000)
 npm run build        # Production build
 npm run start        # Production server (port 3000)
@@ -338,7 +351,7 @@ npm run lint         # ESLint
 npm run db:push      # Push schema → DB
 npm run db:studio    # Prisma Studio GUI
 npm run db:seed      # Seed sample data (idempotent)
-npm run postinstall  # prisma generate
+npm run postinstall  # Full setup (the hook `npm install` runs automatically)
 ```
 
 ---
