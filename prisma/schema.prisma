@@ -15,7 +15,7 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   applications Application[]
-  preferences  Preference?
+  preferences  Preference[]
   resumes      Resume[]
 }
 
@@ -37,17 +37,24 @@ model Resume {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// A saved "target filter": a named bundle of search criteria. Users can have
+/// several (one per role they're targeting) and pick one from the dashboard's
+/// Advanced Filters to narrow the job feed.
 model Preference {
   id               String   @id @default(cuid())
-  userId           String   @unique
+  userId           String
+  name             String   @default("My Filter")
   targetRoles      String
   locations        String
   remoteOnly       Boolean  @default(false)
   visaRequired     Boolean  @default(false)
   minSalary        Int?
   excludedKeywords String
+  createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Job {
@@ -135,7 +142,12 @@ model DailyGoal {
   userId                  String
   date                    DateTime @default(now())
   applicationsTarget      Int      @default(3)
+  // Derived on read: jobs actually applied to that day, plus the manual
+  // adjustment below. Stored so streak calculations can read it directly.
   applicationsCompleted   Int      @default(0)
+  // Manual +1/-1 nudges for applications made outside MatchIQ. Kept separate
+  // from the count so re-deriving from real applications never wipes them.
+  applicationsAdjustment  Int      @default(0)
   networkingTarget        Int      @default(1)
   networkingCompleted     Int      @default(0)
   skillLearningTarget     Int      @default(1)

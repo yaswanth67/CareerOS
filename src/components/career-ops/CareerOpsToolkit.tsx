@@ -185,7 +185,7 @@ const MODES: ModeDef[] = [
 
 interface CareerOpsToolkitProps {
   job: ToolkitJob
-  defaultResumeId?: string
+  defaultResumeId?: string | null
   onClose: () => void
 }
 

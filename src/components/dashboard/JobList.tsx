@@ -13,6 +13,12 @@ interface JobListFilters {
   q?: string
   roles?: string
   loc?: string
+  /** Preferred locations from the target filter, comma-separated (OR-matched). */
+  locs?: string
+  /** Excluded keywords from the target filter, comma-separated. */
+  exclude?: string
+  /** Minimum annual salary from the target filter. */
+  salary?: string
   remote?: string
   posted?: string
   score?: string
@@ -92,6 +98,47 @@ async function getJobs(filters: JobListFilters) {
     )
   }
   if (orConditions.length) where.OR = orConditions
+
+  // Criteria carried by the selected target filter go into AND so they narrow
+  // the feed on top of the free-text OR above instead of widening it.
+  const andConditions: Prisma.JobWhereInput[] = []
+
+  // Preferred locations — a job in any one of them qualifies. "Remote" is a
+  // work mode rather than a place, so it matches the remote flag too.
+  const preferredLocations = filters.locs?.split(',').map(l => l.trim()).filter(Boolean) ?? []
+  if (preferredLocations.length) {
+    andConditions.push({
+      OR: preferredLocations.flatMap(loc =>
+        loc.toLowerCase() === 'remote'
+          ? [{ isRemote: true }, { location: { contains: loc } }]
+          : [{ location: { contains: loc } }]
+      ),
+    })
+  }
+
+  // Excluded keywords are matched against the job title only. Matching the
+  // description too would drop nearly everything — a mid-level posting routinely
+  // mentions "senior" engineers you'd work with.
+  const excluded = filters.exclude?.split(',').map(k => k.trim()).filter(Boolean) ?? []
+  if (excluded.length) {
+    andConditions.push({
+      NOT: { OR: excluded.map(keyword => ({ title: { contains: keyword } })) },
+    })
+  }
+
+  // Minimum salary — a job qualifies when either end of its published range
+  // clears the bar. Jobs that don't publish a salary can't be checked, so they
+  // drop out while this is set.
+  if (filters.salary) {
+    const min = parseInt(filters.salary)
+    if (!isNaN(min) && min > 0) {
+      andConditions.push({
+        OR: [{ salaryMin: { gte: min } }, { salaryMax: { gte: min } }],
+      })
+    }
+  }
+
+  if (andConditions.length) where.AND = andConditions
 
   if (filters.posted) {
     const hours = parseInt(filters.posted)
@@ -240,6 +287,9 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
     q: typeof searchParams?.q === 'string' ? searchParams.q : undefined,
     roles: typeof searchParams?.roles === 'string' ? searchParams.roles : undefined,
     loc: typeof searchParams?.loc === 'string' ? searchParams.loc : undefined,
+    locs: typeof searchParams?.locs === 'string' ? searchParams.locs : undefined,
+    exclude: typeof searchParams?.exclude === 'string' ? searchParams.exclude : undefined,
+    salary: typeof searchParams?.salary === 'string' ? searchParams.salary : undefined,
     remote: typeof searchParams?.remote === 'string' ? searchParams.remote : undefined,
     posted: typeof searchParams?.posted === 'string' ? searchParams.posted : undefined,
     score: typeof searchParams?.score === 'string' ? searchParams.score : undefined,

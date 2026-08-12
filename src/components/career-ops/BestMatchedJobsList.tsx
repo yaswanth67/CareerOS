@@ -295,33 +295,8 @@ export function BestMatchedJobsList() {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={async () => {
-                        // Save as APPLIED and then open the URL
-                        const resumeId = match.resume?.id ?? resumes[0]?.id
-                        if (!resumeId) {
-                          toast({ type: 'error', message: 'Upload a resume first to track applications' })
-                          return
-                        }
-                        try {
-                          const res = await fetch('/api/applications', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ jobId: match.job.id, resumeId, status: 'APPLIED' }),
-                          })
-                          const data = await res.json().catch(() => ({}))
-                          if (res.ok) {
-                            toast({ type: 'success', message: 'Marked as applied — track it under Applications' })
-                            router.refresh()
-                          } else {
-                            toast({ type: 'error', message: data?.error || 'Failed to save application' })
-                          }
-                        } catch {
-                          toast({ type: 'error', message: 'Failed to save application' })
-                        }
-                        // Open the application page
-                        window.open(match.job.applyUrl!, '_blank', 'noopener,noreferrer')
-                      }}
-                      title="Apply to this job (saves to Applications)"
+                      onClick={() => window.open(match.job.applyUrl ?? '', '_blank', 'noopener,noreferrer')}
+                      title="Open application page"
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                       Apply

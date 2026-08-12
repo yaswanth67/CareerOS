@@ -15,7 +15,7 @@ const sizeMap: Record<LogoSize, { box: string; bolt: string; wordmark: string }>
 }
 
 /**
- * MatchIQ brand mark: a gradient tile with a lightning bolt (score/energy) and
+ * Prose brand mark: a gradient tile with a lightning bolt (score/energy) and
  * the wordmark. Reuse everywhere the app is named so branding stays consistent.
  */
 export function Logo({ className, size = 'md', showWordmark = true }: LogoProps) {
@@ -35,8 +35,8 @@ export function Logo({ className, size = 'md', showWordmark = true }: LogoProps)
       </span>
       {showWordmark && (
         <span className={cn('font-bold tracking-tight text-gray-900 dark:text-white leading-none', s.wordmark)}>
-          Match
-          <span className="text-primary-600 dark:text-primary-400">IQ</span>
+          Pro
+          <span className="text-primary-600 dark:text-primary-400">se</span>
         </span>
       )}
     </span>
