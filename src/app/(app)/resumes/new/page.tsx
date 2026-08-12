@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRef, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Upload, FileText, X, Loader2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -16,9 +16,15 @@ type ParsedResumeData = ParsedResume & {
   parsedText: string
 }
 
-export default function ResumeUploadPage() {
+function ResumeUploadPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
+
+  // Optional post-save destination (e.g. /onboarding from the login gate).
+  // Only accept internal paths — blocks open redirects / protocol-relative URLs.
+  const rawNext = searchParams.get('next')
+  const safeNext = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/resumes'
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -96,7 +102,7 @@ export default function ResumeUploadPage() {
       }
 
       toast({ type: 'success', message: 'Resume saved successfully!' })
-      router.push('/resumes')
+      router.push(safeNext)
       router.refresh()
     } catch {
       toast({ type: 'error', message: 'Failed to save resume' })
@@ -296,5 +302,13 @@ export default function ResumeUploadPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+export default function ResumeUploadPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResumeUploadPageContent />
+    </Suspense>
   )
 }

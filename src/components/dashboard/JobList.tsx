@@ -164,8 +164,15 @@ async function getJobs(filters: JobListFilters) {
     } as Job
   })
 
-  // Jobs come back newest-first straight from SQL — no JS re-sort needed.
-  // The score is still shown per card; it just doesn't drive the ordering.
+  // Strong matches first — a user's best fits should surface at the top of the
+  // feed rather than being buried by recency. Unscored jobs (no resume match
+  // yet) sink to the bottom, newest-first among themselves.
+  jobsWithMatch.sort((a, b) => {
+    const scoreA = a.match?.score ?? 0
+    const scoreB = b.match?.score ?? 0
+    if (scoreB !== scoreA) return scoreB - scoreA
+    return b.postedAt.getTime() - a.postedAt.getTime()
+  })
 
   return {
     jobs: jobsWithMatch,

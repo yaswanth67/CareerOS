@@ -36,12 +36,18 @@ export interface FetchResult {
   errors: string[]
 }
 
-export async function fetchAllJobs(filters: JobFetchFilters = {}): Promise<FetchResult[]> {
+export async function fetchAllJobs(
+  filters: JobFetchFilters = {},
+  onProviderResult?: (result: FetchResult) => void
+): Promise<FetchResult[]> {
   const results: FetchResult[] = []
 
   for (const provider of providers) {
     const result = await fetchFromProvider(provider, filters)
     results.push(result)
+    // Optional per-provider progress callback — lets streaming callers (e.g.
+    // the post-login onboarding refresh) report progress to the client.
+    onProviderResult?.(result)
   }
 
   return results
