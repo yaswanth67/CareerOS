@@ -416,10 +416,9 @@ export default function EvaluateJob() {
               <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="font-medium">
-                  Report {result.report.reportNumber != null ? `#${result.report.reportNumber} ` : ''}saved to the
-                  career-ops workspace
+                  Report {result.report.reportNumber != null ? `#${result.report.reportNumber} ` : ''}saved
                 </p>
-                <p className="mt-0.5 text-xs font-mono break-all">{result.report.reportPath}</p>
+                <p className="mt-0.5 text-xs font-mono break-all opacity-75">{result.report.reportPath}</p>
               </div>
             </div>
           )}
