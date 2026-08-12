@@ -221,8 +221,8 @@ export async function POST(request: NextRequest) {
     if (action === 'fetch') {
       const results = await fetchAllJobs()
 
-      // Automatically score the newly available jobs against the user's most
-      // recent resume so every card shows a match score without a manual click.
+      // Automatically score the newly available jobs against ALL user's resumes
+      // so every card shows a match score without a manual click.
       const scored = await autoScoreUserJobs(user.id)
 
       // Classify a batch of the newest unclassified jobs for visa sponsorship
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'score') {
       // Score every active job the user hasn't been matched against yet, using
-      // the fast heuristic scorer. Covers all cards instantly.
+      // the fast heuristic scorer across ALL resumes. Covers all cards instantly.
       const scored = await autoScoreUserJobs(user.id)
       return NextResponse.json({ scored })
     }

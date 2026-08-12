@@ -233,12 +233,32 @@ Be specific (e.g., "React" not "Frontend", "PostgreSQL" not "Databases").`
     })
 
     // Local Claude proxies may prepend a "thinking" block, so find the text block.
+    // Also handle cases where the text block might contain explanation before the JSON array.
     const textBlock = response.content.find(block => block.type === 'text')
     if (textBlock) {
-      const skills = JSON.parse(textBlock.text)
+      // Try to extract JSON array from the response text (handles thinking blocks or explanatory text)
+      const text = textBlock.text.trim()
+      const jsonMatch = text.match(/\[[\s\S]*\]/)
+      const jsonText = jsonMatch ? jsonMatch[0] : text
+
+      // Robust JSON parsing with validation
+      let skills: unknown
+      try {
+        skills = JSON.parse(jsonText)
+      } catch (parseError) {
+        console.warn('Failed to parse AI skills response as JSON, trying to extract manually:', parseError)
+        // Try to manually extract skills from malformed JSON
+        const skillMatches = jsonText.match(/"([^"]+)"/g)
+        if (skillMatches) {
+          skills = skillMatches.map(m => m.replace(/"/g, ''))
+        } else {
+          throw parseError
+        }
+      }
+
       if (Array.isArray(skills)) {
         // Normalize skill names
-        return skills.map(s => s.trim()).filter(Boolean)
+        return skills.map(s => String(s).trim()).filter(Boolean)
       }
     }
   } catch (error) {
@@ -274,11 +294,49 @@ Return format: [{"role": "...", "company": "...", "duration": "...", "achievemen
     })
 
     // Local Claude proxies may prepend a "thinking" block, so find the text block.
+    // Also handle cases where the text block might contain explanation before the JSON array.
     const textBlock = response.content.find(block => block.type === 'text')
     if (textBlock) {
-      const experience = JSON.parse(textBlock.text)
+      // Try to extract JSON array from the response text (handles thinking blocks or explanatory text)
+      const text = textBlock.text.trim()
+      const jsonMatch = text.match(/\[[\s\S]*\]/)
+      const jsonText = jsonMatch ? jsonMatch[0] : text
+
+      // Robust JSON parsing with validation
+      let experience: unknown
+      try {
+        experience = JSON.parse(jsonText)
+      } catch (parseError) {
+        console.warn('Failed to parse AI experience response as JSON, trying to extract manually:', parseError)
+        // Try to manually extract experience from malformed JSON
+        const objMatches = jsonText.match(/\{[\s\S]*?\}/g)
+        if (objMatches) {
+          try {
+            experience = objMatches.map(m => JSON.parse(m))
+          } catch {
+            throw parseError
+          }
+        } else {
+          throw parseError
+        }
+      }
+
       if (Array.isArray(experience)) {
+        // Validate and normalize each experience object
         return experience
+          .filter(e => e && typeof e === 'object')
+          .map(e => {
+            const exp = e as Record<string, unknown>
+            return {
+              role: String(exp.role || '').trim(),
+              company: String(exp.company || '').trim(),
+              duration: String(exp.duration || '').trim(),
+              achievements: Array.isArray(exp.achievements)
+                ? exp.achievements.map((a: unknown) => String(a).trim()).filter(Boolean)
+                : []
+            }
+          })
+          .filter(e => e.role)
       }
     }
   } catch (error) {
@@ -313,11 +371,46 @@ Return format: [{"degree": "...", "school": "...", "year": "..."}, ...]`
     })
 
     // Local Claude proxies may prepend a "thinking" block, so find the text block.
+    // Also handle cases where the text block might contain explanation before the JSON array.
     const textBlock = response.content.find(block => block.type === 'text')
     if (textBlock) {
-      const education = JSON.parse(textBlock.text)
+      // Try to extract JSON array from the response text (handles thinking blocks or explanatory text)
+      const text = textBlock.text.trim()
+      const jsonMatch = text.match(/\[[\s\S]*\]/)
+      const jsonText = jsonMatch ? jsonMatch[0] : text
+
+      // Robust JSON parsing with validation
+      let education: unknown
+      try {
+        education = JSON.parse(jsonText)
+      } catch (parseError) {
+        console.warn('Failed to parse AI education response as JSON, trying to extract manually:', parseError)
+        // Try to manually extract education from malformed JSON
+        const objMatches = jsonText.match(/\{[\s\S]*?\}/g)
+        if (objMatches) {
+          try {
+            education = objMatches.map(m => JSON.parse(m))
+          } catch {
+            throw parseError
+          }
+        } else {
+          throw parseError
+        }
+      }
+
       if (Array.isArray(education)) {
+        // Validate and normalize each education object
         return education
+          .filter(e => e && typeof e === 'object')
+          .map(e => {
+            const edu = e as Record<string, unknown>
+            return {
+              degree: String(edu.degree || '').trim(),
+              school: String(edu.school || '').trim(),
+              year: String(edu.year || '').trim()
+            }
+          })
+          .filter(e => e.degree)
       }
     }
   } catch (error) {
