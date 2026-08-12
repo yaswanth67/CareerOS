@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     // counts itself. Saved-but-not-applied jobs don't — they aren't applications.
     const appliedToday = await countApplicationsApplied(user.id, date)
 
-    // Manual nudges (applications sent outside MatchIQ) sit on top of the real
+    // Manual nudges (applications sent outside Prose) sit on top of the real
     // count and can't drag the total below zero.
     const completed = Math.max(0, appliedToday + dailyGoal.applicationsAdjustment)
 

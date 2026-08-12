@@ -183,7 +183,7 @@ function GoalCard({
       {/* Controls */}
       <div className="mt-3 flex items-center justify-between gap-3 relative z-10">
         {/* Stepper. Applications count themselves as you apply; these nudge the
-            total for anything done outside MatchIQ. */}
+            total for anything done outside Prose. */}
         <div className={cn(
           'flex items-center rounded-lg border bg-white dark:bg-gray-900/60 overflow-hidden',
           colors.border

@@ -37,7 +37,7 @@ export class RemotiveProvider extends BaseJobProvider {
     const jobs: RawJob[] = []
     try {
       const response = await fetch('https://remotive.com/api/remote-jobs', {
-        headers: { 'User-Agent': 'JobMatch AI Bot' },
+        headers: { 'User-Agent': 'Prose AI Bot' },
         signal: AbortSignal.timeout(15000),
       })
 

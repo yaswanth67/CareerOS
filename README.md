@@ -1,4 +1,4 @@
-# MatchIQ
+# Prose
 
 An AI-powered job matching app that pulls live jobs from real job boards, parses your resume, and uses **AI to score how well you match each job** — with reasoning, matched skills, and missing skills.
 
@@ -352,7 +352,7 @@ curl -X POST http://localhost:3000/api/matches \
 ## Project structure
 
 ```
-jobmatch-ai/
+prose/
 ├── prisma/
 │   ├── schema.prisma          # 6 models: User, Resume, Preference (target filter), Job, Match, Application
 │   └── seed.ts                # Idempotent sample data (buddy@gmail.com / qwerty@1)
