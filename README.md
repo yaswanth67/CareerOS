@@ -65,24 +65,28 @@ Every AI feature constructs the Anthropic SDK client from `ANTHROPIC_AUTH_TOKEN 
 npm install
 ```
 
-…or the explicit form (same thing):
+…or the explicit form (identical result):
 
 ```bash
 npm run setup
 ```
 
-Both do the whole first-run flow — safe to re-run, every step is a no-op when already done. `npm install` triggers it automatically through its `postinstall` hook; `npm run setup` is the explicit version and is the one to use if your shell exports `NODE_ENV=production` (which makes plain `npm install` skip dev dependencies — `npm run setup` forces them with `--include=dev`).
+Both run the whole first-run flow automatically and are **safe to re-run** — every step is a no-op when already done. `npm install` triggers it for you through its `postinstall` hook; `npm run setup` is the explicit form and is the one to reach for when your shell exports `NODE_ENV=production` (see [Setup in detail](#setup-in-detail)).
 
 The flow:
 
-1. Creates your `.env` from the template (generates a fresh `NEXTAUTH_SECRET` and `CRON_SECRET`; skips it if `.env` already exists)
-2. Installs all dependencies — dev deps **included**
-3. Generates the Prisma client (`prisma generate`)
-4. Creates the SQLite schema (`prisma db push`)
-5. Seeds sample data (`npm run db:seed`, idempotent)
-6. Installs the **career-ops workspace** (`./career-ops`) — its deps and modes — so the app's Career Ops features (evaluate, cover letter, interview prep, upskill, follow-up, tailor-resume) work out of the box. On a fresh clone the workspace is gitignored, so it bootstraps it via `npx @santifer/career-ops init`.
+| # | Step | What it does |
+|---|------|--------------|
+| 1 | `.env` bootstrap | Copies `.env.example` → `.env` with freshly generated `NEXTAUTH_SECRET` / `CRON_SECRET` (skipped if `.env` exists) |
+| 2 | Install dependencies | `npm install --include=dev` — dev deps **included**, even when the shell exports `NODE_ENV=production` |
+| 3 | Prisma client | `prisma generate` — generates the type-safe client from `prisma/schema.prisma` |
+| 4 | Database schema | `prisma db push` — creates the SQLite `dev.db` from the schema |
+| 5 | Seed data | `npm run db:seed` — idempotent sample user, preferences, resumes, jobs, matches, applications |
+| 6 | Career-ops workspace | Installs `./career-ops` (deps + modes) so the app's Career Ops features work out of the box |
 
-> **Career Ops extras:** the app doesn't need the Playwright browser, but the career-ops CLI's PDF flow does — install it on demand with `cd career-ops && npx playwright install chromium`.
+> **Career Ops extras:** the app itself doesn't need the Playwright browser — only the career-ops CLI's PDF flow does. Install it on demand with `cd career-ops && npx playwright install chromium`.
+
+For the full explanation — how the `postinstall` hook works, the `NODE_ENV=production` gotcha, and the career-ops workspace — see [Setup in detail](#setup-in-detail).
 
 ### 2. Run it
 
@@ -104,6 +108,70 @@ Sign in with the seeded account, or register your own:
 npm run build         # production build (verified passing)
 npm run start         # serve on http://localhost:3000
 ```
+
+---
+
+## Setup in detail
+
+### What the one command actually does
+
+Both `npm install` and `npm run setup` end up running `scripts/setup.mjs` — a single idempotent script that takes a fresh clone to a fully running app in six steps:
+
+1. **`.env` bootstrap** — if `.env` is missing, it's created from `.env.example` with two fresh secrets: `NEXTAUTH_SECRET` (32 random bytes, base64) and `CRON_SECRET` (24 random bytes, hex). An existing `.env` is never touched, so your custom values survive re-runs.
+2. **Dependency install** — `npm install --include=dev`. The `--include=dev` is deliberate: if your shell exports `NODE_ENV=production`, a plain `npm install` silently skips devDependencies (`prisma`, `tsx`, `typescript`, `tailwindcss`, …), which would break both the dev server and the seed step. This flag forces them in regardless.
+3. **Prisma client** — `npx prisma generate` produces `@prisma/client` from `prisma/schema.prisma` before anything touches the database.
+4. **Database schema** — `npx prisma db push` creates/updates the local SQLite file (`prisma/dev.db`). Because SQLite is a single file, there are no migration files to manage.
+5. **Seed** — `npm run db:seed` inserts the sample data (idempotent): the `buddy` account, preferences, sample resumes, jobs, matches, and applications.
+6. **Career-ops workspace** — ensures `./career-ops` exists and has its dependencies installed. This is the vendored tool the app's Career Ops features read their methodology from. See [The career-ops workspace](#the-career-ops-workspace).
+
+### Two equivalent entry points
+
+| Command | When to use |
+|---------|-------------|
+| `npm install` | The default. Runs setup automatically through its `postinstall` hook — you never have to remember a second command. |
+| `npm run setup` | The explicit form. Use it when you want to see the full setup output on its own, or when your shell exports `NODE_ENV=production` and you're on a fresh clone — it forces dev dependencies in. |
+
+Both are safe to re-run any number of times; every step is a no-op when already done.
+
+### How `npm install` runs setup without recursing
+
+`npm run setup` installs dependencies by shelling out to `npm install --include=dev`, and that child install re-fires the root `postinstall` hook — which would otherwise run the setup script again (and again). Two guards prevent that:
+
+- **Skip-install mode** — `postinstall` invokes the setup script in a mode that skips the dependency-install step (npm just ran it), then does steps 1, 3–6. No recursion.
+- **Nested-call guard** — when the child `npm install` inside `npm run setup` re-fires `postinstall`, it inherits `SETUP_ORIGIN=setup-full`, which tells the script it's a nested call under `npm run setup`. It prints a note and exits, leaving the work to the outer run.
+
+The net effect: **every step runs exactly once** in both entry points.
+
+### The `NODE_ENV=production` gotcha
+
+If your shell exports `NODE_ENV=production` (common on CI and some local setups), npm treats installs as production installs and **skips devDependencies**. For this app that's a problem because the tooling that builds and seeds it — `prisma`, `tsx`, `typescript`, `tailwindcss` — all live in devDependencies.
+
+What to do:
+
+- **Fresh clone:** run `npm run setup` (forces dev deps with `--include=dev`), or `env -u NODE_ENV npm install && npm run setup`.
+- **Plain `npm install`** on a fresh clone under this shell prints a clear warning and points you to `npm run setup`. If dependencies are already on disk, `npm install` works fully.
+- `npm run dev` forces `NODE_ENV=development`, so the dev server is unaffected.
+
+### The career-ops workspace
+
+`./career-ops` is the [career-ops](https://career-ops.org) job-search toolkit, vendored into the repo. The app's **Career Ops** features — evaluate a posting, cover letter, interview prep, upskill, follow-up, tailor-resume — read their evaluation methodology (modes, CV, profile) live from this workspace and run it through the app's existing Claude connection, so no separate API key is needed.
+
+- **Location:** `./career-ops` (override with the `CAREER_OPS_DIR` env var).
+- **Git-ignored:** the workspace isn't committed, so setup recreates it on a fresh clone via `npx @santifer/career-ops init`.
+- **Reinstall / repair:** delete it and re-run `npm run setup`, or run `npx @santifer/career-ops init` from the project root.
+- **Update:** run `npx @santifer/career-ops update` from inside `./career-ops`; the app picks up the new modes on the next evaluation.
+- **Optional Playwright browser:** only the career-ops *CLI's* PDF flow needs it — `cd career-ops && npx playwright install chromium`. The app doesn't require it.
+- **If it's missing or setup failed:** the app still runs normally; only Career Ops features report "not installed".
+
+### Re-running, resetting, and repairing
+
+| I want to… | Do this |
+|-----------|---------|
+| Re-run setup | `npm run setup` (no-ops where already done) |
+| Reset the database | `rm prisma/dev.db && npm run db:push && npm run db:seed` |
+| Repair / recreate career-ops | `rm -rf career-ops && npm run setup` (or `npx @santifer/career-ops init`) |
+| Re-seed only | `npm run db:seed` |
+| Inspect the database | `npm run db:studio` |
 
 ---
 
@@ -360,6 +428,9 @@ npm run postinstall  # Full setup (the hook `npm install` runs automatically)
 
 | Symptom | Cause / fix |
 |---------|-------------|
+| `npm install` prints "prisma CLI is missing" | Your shell exports `NODE_ENV=production`, so dev deps were skipped. Run `npm run setup` (or `env -u NODE_ENV npm install && npm run setup`). See [The `NODE_ENV=production` gotcha](#the-node_envproduction-gotcha). |
+| Career Ops features report "not installed" | The `./career-ops` workspace is missing or incomplete. Run `npm run setup`, or `npx @santifer/career-ops init`. |
+| Career-ops CLI PDF fails ("browser not found") | The Playwright browser isn't installed — `cd career-ops && npx playwright install chromium`. |
 | `next dev` fails or binds a weird port | Your shell exports `NODE_ENV=production` or `PORT`. Use `npm run dev` (it forces correct values). |
 | Job fetch returns 0 from Lever / Wellfound | Expected — the Lever companies listed aren't all Lever customers (404), and Wellfound has no public API. Greenhouse is the main source. |
 | `Failed to set fetch cache … over 2MB` in logs | Old provider fetches used `next: {revalidate}`. Removed — fetch now uses `AbortSignal.timeout`. If you re-add caching, don't cache route-handler responses >2MB. |
