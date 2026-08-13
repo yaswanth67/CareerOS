@@ -269,7 +269,7 @@ export class LeverProvider extends BaseJobProvider {
       const url = `https://api.lever.co/v0/postings/${company}?mode=json`
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'CareerOS AI Bot',
+          'User-Agent': 'Prose AI Bot',
         },
         signal: AbortSignal.timeout(10000),
       })

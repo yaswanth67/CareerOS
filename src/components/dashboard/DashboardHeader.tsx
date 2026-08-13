@@ -120,7 +120,7 @@ export function DashboardHeader() {
                   className={cn(
                     'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
                     isActive
-                      ? 'bg-primary-700 text-white shadow-sm dark:bg-primary-200 dark:text-primary-800'
+                      ? 'bg-primary-600 text-white shadow-sm dark:bg-primary-200 dark:text-primary-800'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                   )}
                 >
