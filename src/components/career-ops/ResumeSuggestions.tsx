@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, Loader2, RefreshCw, Search, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
@@ -83,7 +83,10 @@ export function ResumeSuggestions() {
   const scanControllerRef = useRef<AbortController | null>(null)
   const cancelledRef = useRef(false)
   const cacheRef = useRef(jobsCache)
-  cacheRef.current = jobsCache
+  // Update ref in a layout effect to avoid render-time access
+  useLayoutEffect(() => {
+    cacheRef.current = jobsCache
+  }, [jobsCache])
 
   const cacheKey = (keyword: string, resumeId?: string) => `${resumeId || 'latest'}::${keyword}`
 
@@ -95,9 +98,13 @@ export function ResumeSuggestions() {
         const parsed = JSON.parse(cached)
         // Only restore if it's for the same user (we could add userId check)
         if (parsed.suggestions && parsed.suggestions.length > 0) {
-          setSuggestions(parsed.suggestions)
-          setMarkdown(parsed.markdown)
-          setSelectedResumeId(parsed.resumeId || '')
+          // Defer to next tick to avoid synchronous setState in effect
+          const timer = setTimeout(() => {
+            setSuggestions(parsed.suggestions)
+            setMarkdown(parsed.markdown)
+            setSelectedResumeId(parsed.resumeId || '')
+          }, 0)
+          return () => clearTimeout(timer)
         }
       } catch (e) {
         // Ignore parse errors
@@ -105,7 +112,14 @@ export function ResumeSuggestions() {
     }
   }, [])
 
-  // Load scan state from sessionStorage on mount
+  // Restore scan flags from sessionStorage after mount.
+  //
+  // sessionStorage does not exist during server rendering, so this cannot move
+  // into a lazy useState initializer without the server and client disagreeing
+  // on the first render — a hydration mismatch is a worse bug than one extra
+  // render. Restoring after mount is the intended pattern for persisted
+  // client-only UI state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const scanState = sessionStorage.getItem(SCAN_STATE_KEY)
     if (scanState) {
@@ -125,7 +139,9 @@ export function ResumeSuggestions() {
         // Ignore parse errors
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Save scan state to sessionStorage when it changes
   useEffect(() => {
@@ -150,10 +166,10 @@ export function ResumeSuggestions() {
     }
   }, [suggestions, markdown, selectedResumeId])
 
-  // Clear cache when resume selection changes
-  useEffect(() => {
-    setJobsCache(new Map())
-  }, [selectedResumeId])
+  // No cache-clearing effect on resume change: `cacheKey` is `${resumeId}::${keyword}`,
+  // so picking a different resume simply misses the cache and refetches. Two
+  // effects used to wipe the whole Map here — redundant, and one of them wrote
+  // state synchronously inside an effect.
 
   const fetchResumes = useCallback(async () => {
     setResumesLoading(true)
@@ -193,52 +209,6 @@ export function ResumeSuggestions() {
     setError(null)
   }
 
-  // On mount: rejoin a scan that is already running, and only start a new one
-  // when nothing is in flight and there is nothing cached to show. Without the
-  // first branch, navigating away and back abandoned the running scan and
-  // kicked off a fresh one — so a 4–6 minute scan could never finish if you
-  // looked at another page while waiting.
-  useEffect(() => {
-    const running = getActiveScan()
-    if (running) {
-      let cancelled = false
-      running.promise
-        .then(data => {
-          if (cancelled) return
-          setSuggestions((data.suggestions as RoleSuggestion[]) || [])
-          setMarkdown(data.markdown)
-        })
-        .catch(() => {
-          // The mount that started the scan owns error reporting.
-        })
-        .finally(() => {
-          if (cancelled) return
-          setLoading(false)
-          // These are cleared in handleScan's `finally`, which this mount never
-          // ran — without clearing them here the "scan running in background"
-          // banner outlived the scan it described.
-          setIsManualScanActive(false)
-          setIsScanningInBackground(false)
-          setHasAutoScanned(true)
-        })
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const timer = setTimeout(() => {
-      if (!hasAutoScanned && suggestions.length === 0) {
-        handleScan(true) // true = isAutoScan
-      }
-    }, 100)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasAutoScanned, suggestions.length])
-
-  // Clear job cache when resume selection changes, since different resumes yield different results
-  useEffect(() => {
-    setJobsCache(new Map())
-  }, [selectedResumeId])
 
   const handleScan = async (isAutoScan = false) => {
     if (!isAutoScan) {
@@ -321,6 +291,48 @@ export function ResumeSuggestions() {
       return { ...prev, [title]: refreshing }
     })
   }, [])
+
+  // On mount: rejoin a scan that is already running, and only start a new one
+  // when nothing is in flight and there is nothing cached to show. Without the
+  // first branch, navigating away and back abandoned the running scan and
+  // kicked off a fresh one — so a 4–6 minute scan could never finish if you
+  // looked at another page while waiting.
+  useEffect(() => {
+    const running = getActiveScan()
+    if (running) {
+      let cancelled = false
+      running.promise
+        .then(data => {
+          if (cancelled) return
+          setSuggestions((data.suggestions as RoleSuggestion[]) || [])
+          setMarkdown(data.markdown)
+        })
+        .catch(() => {
+          // The mount that started the scan owns error reporting.
+        })
+        .finally(() => {
+          if (cancelled) return
+          setLoading(false)
+          // These are cleared in handleScan's `finally`, which this mount never
+          // ran — without clearing them here the "scan running in background"
+          // banner outlived the scan it described.
+          setIsManualScanActive(false)
+          setIsScanningInBackground(false)
+          setHasAutoScanned(true)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const timer = setTimeout(() => {
+      if (!hasAutoScanned && suggestions.length === 0) {
+        handleScan(true) // true = isAutoScan
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAutoScanned, suggestions.length])
 
   const triggerFreshListings = (title: string) => {
     if (refreshingTitles[title]) return

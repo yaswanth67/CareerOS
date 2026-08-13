@@ -110,7 +110,7 @@ async function scoreWithAnthropic(
     throw new Error('Unexpected response type')
   }
 
-  let result = JSON.parse(textBlock.text)
+  const result = JSON.parse(textBlock.text)
 
   // Validate and clamp score
   result.score = Math.max(0, Math.min(100, Math.round(result.score)))

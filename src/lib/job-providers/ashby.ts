@@ -295,7 +295,10 @@ export class AshbyProvider extends BaseJobProvider {
           description,
           requirements: this.extractRequirements(description),
           skills: await this.extractSkills(description),
-          experienceLevel: job.employmentType || '',
+          // employmentType is "FullTime"/"Contract" — an employment type, not a
+          // seniority. Feeding it here shadowed the title and made every Ashby
+          // posting MID. Left blank so the title decides.
+          experienceLevel: '',
           roleType: '',
           applyUrl: job.applyUrl || job.jobUrl || '',
           postedAt: job.publishedAt ? new Date(job.publishedAt) : new Date(),

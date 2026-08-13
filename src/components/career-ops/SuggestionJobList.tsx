@@ -168,7 +168,9 @@ export function SuggestionJobList({
 
   useEffect(() => {
     if (refreshToken && refreshToken > 0) {
-      load(true)
+      // Defer to next tick to avoid synchronous setState in effect
+      const timer = setTimeout(() => load(true), 0)
+      return () => clearTimeout(timer)
     }
   }, [load, refreshToken])
 

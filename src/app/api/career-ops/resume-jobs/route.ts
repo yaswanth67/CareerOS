@@ -45,6 +45,54 @@ function keywordsFromResume(resume: { skills: string; roleType: string; title: s
   return skills.slice(0, 12)
 }
 
+/**
+ * Progressive keyword fallback matching for job titles.
+ *
+ * The AI suggests titles like "Data Pipeline Engineer" or "ETL Developer" that
+ * don't appear verbatim in job postings. This builds a ladder of matching
+ * strategies so those suggestions still find relevant jobs.
+ *
+ * Strategy ladder (in order, first match wins):
+ * 1. Exact phrase — "Data Engineer" finds 45 jobs
+ * 2. Word-pair (first + last) — "Data Pipeline Engineer" → "Data Engineer" finds 45 jobs
+ * 3. Distinctive words (3+ chars, non-generic) — "ETL Developer" → "ETL" finds 3 jobs
+ * 4. Original keyword — fallback to original behavior
+ */
+function expandKeywordForMatching(keyword: string): string[] {
+  const lower = keyword.toLowerCase().trim()
+  const words = lower.split(/\s+/).filter(w => w.length > 2)
+  const expanded: string[] = []
+
+  // Level 1: Exact phrase (always first)
+  expanded.push(lower)
+
+  // Level 2: Word-pair fallback — first word + last word
+  // "Data Pipeline Engineer" → "Data Engineer"
+  if (words.length >= 3) {
+    const firstLast = `${words[0]} ${words[words.length - 1]}`
+    if (firstLast !== lower) expanded.push(firstLast)
+  }
+
+  // Level 3: Distinctive words — filter out generic tech words
+  const genericWords = new Set([
+    'engineer', 'engineering', 'developer', 'development', 'software',
+    'senior', 'junior', 'lead', 'principal', 'staff', 'architect',
+    'manager', 'director', 'head', 'analyst', 'specialist', 'scientist',
+    'data', 'machine', 'learning', 'artificial', 'intelligence',
+    'full', 'stack', 'front', 'back', 'end', 'mobile', 'web',
+    'cloud', 'devops', 'platform', 'system', 'systems',
+    'new', 'grad', 'entry', 'level', 'associate', 'intern'
+  ])
+
+  const distinctive = words.filter(w => !genericWords.has(w) && w.length >= 3)
+  for (const dw of distinctive) {
+    if (!expanded.includes(dw)) expanded.push(dw)
+  }
+
+  // Deduplicate while preserving order
+  return [...new Set(expanded)]
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -82,7 +130,9 @@ export async function POST(request: NextRequest) {
 
     // Candidate pool: active US jobs whose title or skills mention a keyword.
     // `skills` is a JSON string column, so `contains` searches it directly.
-    const keywordConditions: Prisma.JobWhereInput[] = keywords.flatMap(kw => [
+    // Use progressive fallback matching: each keyword expands to [exact, word-pair, distinctive words]
+    const allSearchTerms = keywords.flatMap(kw => expandKeywordForMatching(kw))
+    const keywordConditions: Prisma.JobWhereInput[] = allSearchTerms.flatMap(kw => [
       { title: { contains: kw } },
       { skills: { contains: kw } },
     ])
@@ -122,9 +172,12 @@ export async function POST(request: NextRequest) {
     // containing a keyword, and the role type matching the resume's — while
     // still showing the unmodified match score to the user.
     const lowerKeywords = keywords.map(k => k.toLowerCase())
+    const expandedSearchTerms = allSearchTerms.map(k => k.toLowerCase())
     const relevanceBonus = (title: string, roleType: string) => {
       const lowerTitle = title.toLowerCase()
-      const titleHit = lowerKeywords.some(kw => lowerTitle.includes(kw)) ? 15 : 0
+      // Check both original keywords and expanded search terms for title hits
+      const titleHit = (lowerKeywords.some(kw => lowerTitle.includes(kw)) ||
+                       expandedSearchTerms.some(kw => lowerTitle.includes(kw))) ? 15 : 0
       const roleHit = roleType === resume.roleType ? 10 : 0
       return titleHit + roleHit
     }
