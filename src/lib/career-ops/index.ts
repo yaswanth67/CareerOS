@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { persistCareerOpsReport } from './persist'
+import { SDK_TIMEOUT_MS } from './timeouts'
 
 // Runs career-ops' Claude evaluation pipeline — the same one the tool drives
 // inside Claude Code — but through the app's existing Claude connection
@@ -22,11 +23,10 @@ if (anthropicApiKey) {
   anthropic = new Anthropic({
     baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
     apiKey: anthropicApiKey,
-    // Fail fast (5 min) if the local Claude proxy is down instead of hanging
-    // for the SDK default (10 min) — a dead connection should never look like
-    // an infinite spinner in the UI. The proxy is slow (~110 output tokens/sec),
-    // so keep this well above the UI's 240s client timeout.
-    timeout: 300_000,
+    // Ceiling for a proxy round-trip. Kept above the browser's abort so the
+    // client is the one that gives up first with a readable message — see
+    // src/lib/career-ops/timeouts.ts for why these are as large as they are.
+    timeout: SDK_TIMEOUT_MS,
   })
 }
 

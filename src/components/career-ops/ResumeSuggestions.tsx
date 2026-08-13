@@ -6,6 +6,17 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
 import { SuggestionJobList, type SuggestionJob } from '@/components/career-ops/SuggestionJobList'
+import {
+  CLIENT_ABORT_MS,
+  CLIENT_TIMEOUT_MESSAGE,
+  TYPICAL_DURATION_LABEL,
+} from '@/lib/career-ops/timeouts'
+import {
+  activeScanElapsed,
+  cancelActiveScan,
+  getActiveScan,
+  startOrAdoptScan,
+} from '@/lib/career-ops/scan-registry'
 
 interface RoleSuggestion {
   title: string
@@ -42,7 +53,10 @@ export function ResumeSuggestions() {
   const [resumes, setResumes] = useState<ResumeOption[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState('')
   const [resumesLoading, setResumesLoading] = useState(false)
-  const [loading, setLoading] = useState(false)
+  // Seeded from the registry: if a scan is already running when this mounts
+  // (you navigated away and came back), render straight into the loading state
+  // rather than writing it from an effect.
+  const [loading, setLoading] = useState(() => Boolean(getActiveScan()))
   const [error, setError] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<RoleSuggestion[]>([])
   const [markdown, setMarkdown] = useState<string | null>(null)
@@ -63,6 +77,11 @@ export function ResumeSuggestions() {
 
   // Cache fetched jobs per (keyword + resumeId) so switching tabs or reopening doesn't refetch.
   const [jobsCache, setJobsCache] = useState<Map<string, SuggestionJob[]>>(new Map())
+  // Live scan controls: the elapsed counter turns a multi-minute wait into
+  // visible progress, and the ref lets the Cancel button abort the same request.
+  const [elapsed, setElapsed] = useState(() => activeScanElapsed())
+  const scanControllerRef = useRef<AbortController | null>(null)
+  const cancelledRef = useRef(false)
   const cacheRef = useRef(jobsCache)
   cacheRef.current = jobsCache
 
@@ -154,14 +173,66 @@ export function ResumeSuggestions() {
     return () => clearTimeout(timer)
   }, [fetchResumes])
 
-  // Auto-scan on mount if no cached results
+  // Count up only while a scan is in flight. The reset lives in the scan
+  // handler rather than here — writing state synchronously on the !loading
+  // branch of an effect is a cascading render.
   useEffect(() => {
+    if (!loading) return
+    // Seeded from the registry, not from now: after a remount the scan has
+    // already been running for a while, and restarting the count at 0:00 would
+    // suggest the work restarted too.
+    const id = setInterval(() => setElapsed(activeScanElapsed()), 1000)
+    return () => clearInterval(id)
+  }, [loading])
+
+  /** Abort the in-flight scan at the user's request (not a failure). */
+  const cancelScan = () => {
+    cancelledRef.current = true
+    cancelActiveScan()
+    setLoading(false)
+    setError(null)
+  }
+
+  // On mount: rejoin a scan that is already running, and only start a new one
+  // when nothing is in flight and there is nothing cached to show. Without the
+  // first branch, navigating away and back abandoned the running scan and
+  // kicked off a fresh one — so a 4–6 minute scan could never finish if you
+  // looked at another page while waiting.
+  useEffect(() => {
+    const running = getActiveScan()
+    if (running) {
+      let cancelled = false
+      running.promise
+        .then(data => {
+          if (cancelled) return
+          setSuggestions((data.suggestions as RoleSuggestion[]) || [])
+          setMarkdown(data.markdown)
+        })
+        .catch(() => {
+          // The mount that started the scan owns error reporting.
+        })
+        .finally(() => {
+          if (cancelled) return
+          setLoading(false)
+          // These are cleared in handleScan's `finally`, which this mount never
+          // ran — without clearing them here the "scan running in background"
+          // banner outlived the scan it described.
+          setIsManualScanActive(false)
+          setIsScanningInBackground(false)
+          setHasAutoScanned(true)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
     const timer = setTimeout(() => {
       if (!hasAutoScanned && suggestions.length === 0) {
         handleScan(true) // true = isAutoScan
       }
     }, 100)
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasAutoScanned, suggestions.length])
 
   // Clear job cache when resume selection changes, since different resumes yield different results
@@ -173,6 +244,7 @@ export function ResumeSuggestions() {
     if (!isAutoScan) {
       setLoading(true)
       setIsManualScanActive(true)
+      setElapsed(0)
       setError(null)
       setSuggestions([])
       setMarkdown(null)
@@ -182,43 +254,54 @@ export function ResumeSuggestions() {
       setIsScanningInBackground(true)
     }
 
-    // The local Claude proxy is slow (~110 output tokens/sec), and the titles
-    // eval sends an ~11k-token prompt plus a long report — 1–3 min is normal.
-    // Abort after 240s so a genuinely hung connection still surfaces as a clear
-    // error instead of an infinite spinner.
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 240_000)
-    try {
-      const res = await fetch('/api/career-ops/suggest', {
+    // The request is registered module-side rather than owned by this
+    // component: a scan runs for minutes, and leaving the page used to orphan
+    // it and start a fresh one on return. `startOrAdoptScan` hands back the run
+    // already in progress for this resume, so remounting joins it instead.
+    // Budget lives in src/lib/career-ops/timeouts.ts.
+    const scan = startOrAdoptScan(selectedResumeId || 'latest', signal => {
+      const timeoutId = setTimeout(() => scanControllerRef.current?.abort(), CLIENT_ABORT_MS)
+      return fetch('/api/career-ops/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resumeId: selectedResumeId || undefined }),
-        signal: controller.signal,
+        signal,
       })
-      const data: SuggestApiResponse = await res.json().catch(() => ({}))
-      if (res.ok && data.markdown) {
-        setSuggestions(data.suggestions || [])
-        setMarkdown(data.markdown)
-        if (!isAutoScan) {
-          toast({ type: 'success', message: 'Role suggestions ready!' })
-        }
-      } else {
-        setError(data?.error || 'Failed to scan your resume.')
-        if (!isAutoScan) {
-          toast({ type: 'error', message: data?.error || 'Failed to scan your resume.' })
-        }
+        .then(async res => {
+          const data: SuggestApiResponse = await res.json().catch(() => ({}))
+          if (!res.ok || !data.markdown) {
+            throw new Error(data?.error || 'Failed to scan your resume.')
+          }
+          return { suggestions: data.suggestions || [], markdown: data.markdown }
+        })
+        .finally(() => clearTimeout(timeoutId))
+    })
+    scanControllerRef.current = scan.controller
+
+    try {
+      const data = await scan.promise
+      setSuggestions((data.suggestions as RoleSuggestion[]) || [])
+      setMarkdown(data.markdown)
+      if (!isAutoScan) {
+        toast({ type: 'success', message: 'Role suggestions ready!' })
       }
     } catch (err) {
       const aborted = err instanceof DOMException && err.name === 'AbortError'
+      // A user-initiated cancel is not a failure — say nothing and reset.
+      if (aborted && cancelledRef.current) {
+        cancelledRef.current = false
+        return
+      }
       const message = aborted
-        ? 'Timed out after 4 minutes — your Claude connection (port 20128) is unusually slow or not responding. Check your Claude Code session and retry.'
-        : 'Something went wrong. Try again.'
+        ? CLIENT_TIMEOUT_MESSAGE
+        : err instanceof Error && err.message
+          ? err.message
+          : 'Something went wrong. Try again.'
       setError(message)
       if (!isAutoScan) {
         toast({ type: 'error', message })
       }
     } finally {
-      clearTimeout(timeoutId)
       if (!isAutoScan) {
         setLoading(false)
         setIsManualScanActive(false)
@@ -294,10 +377,8 @@ export function ResumeSuggestions() {
           </div>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Scans the resume and proposes role titles calibrated to your profile level. Click{' '}
-          <span className="text-gray-600 dark:text-gray-400 font-medium">View jobs</span> on a
-          suggestion to see real US postings for it, scored against your resume, each linking to the
-          employer&apos;s official application page.
+          Job titles worth searching for, based on your resume — matched to your level, so senior
+          roles are left out.
         </p>
       </div>
 
@@ -314,15 +395,27 @@ export function ResumeSuggestions() {
         </div>
       )}
 
-      {/* Loading */}
+      {/* Loading. The elapsed counter matters: this legitimately runs for
+          minutes, and a bare spinner is indistinguishable from a hang. */}
       {loading && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-6 flex items-start gap-3">
           <Loader2 className="w-5 h-5 animate-spin text-primary-500 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            <p className="font-medium text-gray-900 dark:text-white">Scanning your resume…</p>
+          <div className="flex-1 min-w-0 text-sm text-gray-600 dark:text-gray-300">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="font-medium text-gray-900 dark:text-white">
+                Scanning your resume…{' '}
+                <span className="tabular-nums text-gray-500 dark:text-gray-400">
+                  {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
+                </span>
+              </p>
+              <Button variant="ghost" size="sm" onClick={cancelScan}>
+                Cancel
+              </Button>
+            </div>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              This runs the career-ops titles evaluation through the local Claude connection, so it
-              typically takes 1–3 minutes.
+              This runs the career-ops titles evaluation through your local Claude connection.
+              It normally takes {TYPICAL_DURATION_LABEL} — the results appear here when it finishes,
+              so you can leave this page open.
             </p>
           </div>
         </div>

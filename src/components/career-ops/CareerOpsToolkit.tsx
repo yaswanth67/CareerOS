@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
 import { downloadFile } from '@/lib/utils'
+import { CLIENT_ABORT_MS, CLIENT_TIMEOUT_MESSAGE, TYPICAL_DURATION_LABEL } from '@/lib/career-ops/timeouts'
 import { DrawerPortal } from '@/components/ui/DrawerPortal'
 
 export interface ToolkitJob {
@@ -84,7 +85,7 @@ const MODES: ModeDef[] = [
     id: 'description',
     label: 'Description',
     icon: BookOpen,
-    blurb: 'The full posting text as stored.',
+    blurb: 'The full job posting.',
   },
   {
     id: 'report',
@@ -93,7 +94,7 @@ const MODES: ModeDef[] = [
     // runEvaluation persists internally (src/lib/career-ops/index.ts), so this
     // one writes a numbered report and a tracker row into the career-ops
     // workspace. Say so — every other mode here is read-only.
-    blurb: 'career-ops A–G evaluation with a 0–5 score. Also files a numbered report in your career-ops workspace and adds a tracker row.',
+    blurb: 'How well this job fits you, scored 0–5 with the reasoning behind it. Saves a copy you can revisit.',
     endpoint: job => `/api/jobs/${job.id}/career-ops`,
     resultKey: 'report',
     body: (_job, resumeId) => ({ resumeId: resumeId || undefined }),
@@ -103,7 +104,7 @@ const MODES: ModeDef[] = [
     id: 'resume',
     label: 'Tailor CV',
     icon: FileText,
-    blurb: 'Rewrites your resume against this posting. Never invents experience.',
+    blurb: 'Your resume, rewritten for this job. Only reorders and reframes what you already have.',
     endpoint: () => '/api/career-ops/tailor-resume',
     resultKey: 'resume',
     body: (job, resumeId) => ({ jobId: job.id, resumeId: resumeId || undefined }),
@@ -113,7 +114,7 @@ const MODES: ModeDef[] = [
     id: 'cover',
     label: 'Cover letter',
     icon: Sparkles,
-    blurb: 'Tailored cover letter with ATS keywords woven in.',
+    blurb: 'A cover letter for this job, using the words the posting asks for.',
     endpoint: () => '/api/career-ops/cover',
     resultKey: 'coverLetter',
     body: (job, resumeId) => ({ jobId: job.id, resumeId: resumeId || undefined }),
@@ -123,7 +124,7 @@ const MODES: ModeDef[] = [
     id: 'email',
     label: 'Email',
     icon: Mail,
-    blurb: 'Draft only — nothing is ever sent for you.',
+    blurb: 'A ready-to-send email. Nothing is sent for you — you copy it.',
     endpoint: () => '/api/career-ops/email',
     resultKey: 'email',
     body: (job, resumeId, variant) => ({
@@ -137,7 +138,7 @@ const MODES: ModeDef[] = [
     id: 'linkedin',
     label: 'LinkedIn message',
     icon: MessageCircle,
-    blurb: 'Short, first-person outreach — an InMail/connection note to the recruiter or hiring manager.',
+    blurb: 'A short LinkedIn note to the recruiter or hiring manager.',
     endpoint: () => '/api/career-ops/email',
     resultKey: 'email',
     body: (job, resumeId) => ({
@@ -151,7 +152,7 @@ const MODES: ModeDef[] = [
     id: 'interview',
     label: 'Interview prep',
     icon: MessageSquare,
-    blurb: 'Likely rounds, panel intel and questions to expect.',
+    blurb: 'What to expect: the rounds, who you meet, and likely questions.',
     endpoint: () => '/api/career-ops/interview-prep',
     resultKey: 'prep',
     body: (job, resumeId) => ({ jobId: job.id, resumeId: resumeId || undefined }),
@@ -161,7 +162,7 @@ const MODES: ModeDef[] = [
     id: 'followup',
     label: 'Follow-up',
     icon: Send,
-    blurb: 'Cadence and draft touchpoints after applying.',
+    blurb: 'When to follow up after applying, and what to say.',
     endpoint: () => '/api/career-ops/followup',
     resultKey: 'followup',
     body: (job, resumeId) => ({
@@ -175,7 +176,7 @@ const MODES: ModeDef[] = [
     id: 'upskill',
     label: 'Upskill',
     icon: GraduationCap,
-    blurb: 'Skill gaps across your pipeline, weighted by how often they appear.',
+    blurb: 'The skills coming up most often in jobs you look at, and what to learn first.',
     endpoint: () => '/api/career-ops/upskill',
     resultKey: 'upskill',
     body: job => ({ targetedUrl: job.applyUrl || undefined }),
@@ -246,10 +247,11 @@ export function CareerOpsToolkit({ job, defaultResumeId, onClose }: CareerOpsToo
       setLoading(target.id)
       setErrors(prev => ({ ...prev, [target.id]: undefined }))
 
-      // These run through the local Claude connection and routinely take
-      // 1–3 minutes; abort well past that so a hung connection still surfaces.
+      // Generations run for minutes against the local router; the shared
+      // budget keeps this above the measured worst case so a slow-but-working
+      // run is never cut off. See src/lib/career-ops/timeouts.ts.
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 300_000)
+      const timeoutId = setTimeout(() => controller.abort(), CLIENT_ABORT_MS)
       try {
         const res = await fetch(target.endpoint(job), {
           method: 'POST',
@@ -276,9 +278,7 @@ export function CareerOpsToolkit({ job, defaultResumeId, onClose }: CareerOpsToo
         toast({ type: 'success', message: `${target.label} ready` })
       } catch (err) {
         const aborted = err instanceof DOMException && err.name === 'AbortError'
-        const message = aborted
-          ? 'Timed out after 5 minutes — check that your Claude connection on port 20128 is running.'
-          : 'Something went wrong. Try again.'
+        const message = aborted ? CLIENT_TIMEOUT_MESSAGE : 'Something went wrong. Try again.'
         setErrors(prev => ({ ...prev, [target.id]: message }))
         toast({ type: 'error', message })
       } finally {
@@ -469,7 +469,8 @@ export function CareerOpsToolkit({ job, defaultResumeId, onClose }: CareerOpsToo
                   Generating {mode.label.toLowerCase()}…
                 </p>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  This runs through your local Claude connection, so 1–3 minutes is normal.
+                  This runs through your local Claude connection, so {TYPICAL_DURATION_LABEL} is
+                  normal. Leave the drawer open — the result appears here when it finishes.
                 </p>
               </div>
             </div>
