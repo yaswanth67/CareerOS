@@ -392,7 +392,7 @@ export default function PreferencesPage() {
                             className={cn(
                               'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
                               selected
-                                ? 'bg-primary-700 text-white shadow-md shadow-primary-600/25'
+                                ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
                                 : 'bg-belgium-100 text-khaki-700 hover:bg-belgium-200'
                             )}
                           >

@@ -40,7 +40,7 @@ export class RemoteOkProvider extends BaseJobProvider {
     const jobs: RawJob[] = []
     try {
       const response = await fetch('https://remoteok.com/api', {
-        headers: { 'User-Agent': 'CareerOS AI Bot' },
+        headers: { 'User-Agent': 'Prose AI Bot' },
         signal: AbortSignal.timeout(15000),
       })
 
