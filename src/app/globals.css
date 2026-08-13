@@ -107,28 +107,36 @@ html {
 }
 
 @layer components {
+  /* No `disabled:opacity-50` here. Fading a button toward the cream page dims
+     its label as much as its background: a disabled primary button measured
+     2.02:1, far under the 4.5:1 minimum, which is why disabled and in-flight
+     buttons were unreadable. Each variant sets its own muted-but-legible
+     disabled colours below; the cursor carries the "inactive" signal. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed;
   }
 
+  /* primary-700 rather than -600: 7.09:1 against white, where -600 was 4.99:1. */
   .btn-primary {
-    @apply btn bg-primary-600 text-belgium-50 hover:bg-primary-700 focus:ring-primary-500;
+    /* White label, one background, no hover or disabled colour shift — the
+       label must never depend on state to be readable. */
+    @apply btn bg-primary-700 text-white hover:bg-primary-700 focus:ring-primary-500 disabled:bg-primary-700 disabled:text-white disabled:hover:bg-primary-700;
   }
 
   .btn-secondary {
-    @apply btn bg-belgium-200 text-khaki-900 hover:bg-belgium-300 focus:ring-khaki-500;
+    @apply btn bg-belgium-200 text-khaki-900 hover:bg-belgium-300 focus:ring-khaki-500 disabled:bg-belgium-100 disabled:text-khaki-700 disabled:hover:bg-belgium-100;
   }
 
   .btn-outline {
-    @apply btn border border-belgium-300 bg-transparent hover:bg-belgium-100 focus:ring-khaki-500;
+    @apply btn border border-belgium-300 bg-transparent hover:bg-belgium-100 focus:ring-khaki-500 disabled:border-belgium-200 disabled:text-khaki-700 disabled:hover:bg-transparent;
   }
 
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-belgium-100 focus:ring-khaki-500;
+    @apply btn bg-transparent hover:bg-belgium-100 focus:ring-khaki-500 disabled:text-khaki-700 disabled:hover:bg-transparent;
   }
 
   .btn-danger {
-    @apply btn bg-danger-500 text-white hover:bg-danger-600 focus:ring-danger-500;
+    @apply btn bg-danger-600 text-white hover:bg-danger-600 focus:ring-danger-500 disabled:bg-danger-600 disabled:text-white disabled:hover:bg-danger-600;
   }
 
   .btn-gold {
@@ -303,16 +311,27 @@ html {
     animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  /* Prevent invisible white text on light backgrounds
-     When an element uses `text-white` but sits on a light background
-     (card / bg-white / belgium off-white), force it to the khaki-700
-     brand color so text remains legible. This targets only white text
-     that would otherwise disappear on light surfaces. */
-  .bg-white .text-white,
-  .card .text-white,
-  .bg-belgium-50 .text-white,
-  .bg-belgium-100 .text-white,
-  .bg-belgium-200 .text-white {
+  /* Prevent invisible white text on light backgrounds.
+     When an element uses `text-white` but sits *directly* on a light surface
+     (card / bg-white / belgium off-white), force it to khaki-700 so it stays
+     legible.
+
+     The two :not() guards are essential. Without them this rule also caught
+     elements that paint their own dark background — every primary button, in
+     other words — and repainted their white labels dark green on dark green,
+     at 1.00:1 contrast. That is what made "Save", "All Jobs" and
+     "Scan resume & suggest roles" look like blank green rectangles.
+
+       :not(button):not(a)      — controls supply their own background
+       :not([class*="bg-"])     — so does anything carrying a bg-* utility
+
+     What remains is the case the rule was written for: bare text nodes
+     (a div, p or span with white text and no surface of its own). */
+  .bg-white .text-white:not(button):not(a):not([class*='bg-']),
+  .card .text-white:not(button):not(a):not([class*='bg-']),
+  .bg-belgium-50 .text-white:not(button):not(a):not([class*='bg-']),
+  .bg-belgium-100 .text-white:not(button):not(a):not([class*='bg-']),
+  .bg-belgium-200 .text-white:not(button):not(a):not([class*='bg-']) {
     color: rgb(85 91 67) !important; /* text-khaki-700 */
   }
 

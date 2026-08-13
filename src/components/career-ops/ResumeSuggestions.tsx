@@ -246,10 +246,10 @@ export function ResumeSuggestions() {
       setIsManualScanActive(true)
       setElapsed(0)
       setError(null)
-      setSuggestions([])
-      setMarkdown(null)
-      setOpenJobsFor(null)
-      setJobsCache(new Map()) // Clear job cache for new scan
+      // Existing suggestions are left alone until the new ones arrive — see the
+      // results block below. Clearing them here blanked the page for the whole
+      // 4–6 minute scan.
+      setJobsCache(new Map()) // job lists are per-scan, so drop the cache
     } else {
       setIsScanningInBackground(true)
     }
@@ -333,7 +333,7 @@ export function ResumeSuggestions() {
 
   return (
     <div className="relative space-y-4">
-      {markdown && !loading && (
+      {markdown && (
         <Button
           type="button"
           variant="primary"
@@ -437,8 +437,12 @@ export function ResumeSuggestions() {
         </div>
       )}
 
-      {/* Results */}
-      {!loading && (suggestions.length > 0 || markdown) && (
+      {/* Results. Deliberately NOT gated on `!loading`: a scan runs for minutes,
+          and hiding the results while it does meant a re-scan wiped the
+          suggestions off the page — including an expanded job list you were
+          reading. Previous results stay put and are replaced when the new ones
+          land. */}
+      {(suggestions.length > 0 || markdown) && (
         <>
           {suggestions.length > 0 ? (
             <div className="space-y-2">

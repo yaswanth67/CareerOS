@@ -99,7 +99,7 @@ async function ensureProfileYml(candidate: CareerOpsCandidate): Promise<void> {
   const profilePath = path.join(careerOpsDir(), 'config', 'profile.yml')
   if (existsSync(profilePath)) return // preserve any existing career-ops profile
 
-  const fullName = candidate.name || 'MatchIQ user'
+  const fullName = candidate.name || 'CareerOS user'
   // JSON.stringify produces a safe double-quoted YAML string.
   const profile = [
     'candidate:',
