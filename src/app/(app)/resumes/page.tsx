@@ -202,7 +202,7 @@ export default function ResumesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Resumes</h1>
+          <h1 className="text-2xl font-bold text-khaki-900">My Resumes</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
             Manage your tailored resumes for different role types
           </p>
@@ -218,7 +218,7 @@ export default function ResumesPage() {
       {resumes.length === 0 ? (
         <Card className="text-center py-12">
           <FileText className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">No resumes yet</h3>
+          <h3 className="text-lg font-medium text-khaki-900">No resumes yet</h3>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
             Upload your first resume to start matching with jobs
           </p>
@@ -236,7 +236,7 @@ export default function ResumesPage() {
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                    <h3 className="font-semibold text-khaki-900">
                       {resume.title}
                     </h3>
                     <Badge variant="info" className="mt-1">

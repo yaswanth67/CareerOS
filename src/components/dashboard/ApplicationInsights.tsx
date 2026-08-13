@@ -35,10 +35,10 @@ interface ApplicationInsightsProps {
 }
 
 const FUNNEL_STAGES: { status: AppStatus; label: string; color: string }[] = [
-  { status: 'SAVED', label: 'Saved', color: 'bg-gray-400 dark:bg-gray-500' },
+  { status: 'SAVED', label: 'Saved', color: 'bg-khaki-400 dark:bg-khaki-500' },
   { status: 'APPLIED', label: 'Applied', color: 'bg-primary-500' },
-  { status: 'INTERVIEWING', label: 'Interviewing', color: 'bg-amber-500' },
-  { status: 'OFFER', label: 'Offer', color: 'bg-emerald-500' },
+  { status: 'INTERVIEWING', label: 'Interviewing', color: 'bg-gold-500' },
+  { status: 'OFFER', label: 'Offer', color: 'bg-success-500' },
 ]
 
 export function ApplicationInsights({ applications, visible }: ApplicationInsightsProps) {
@@ -123,7 +123,7 @@ export function ApplicationInsights({ applications, visible }: ApplicationInsigh
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
               Application funnel
             </p>
-            <div className="flex h-8 w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+            <div className="flex h-8 w-full overflow-hidden rounded-lg bg-belgium-200 dark:bg-khaki-800">
               {FUNNEL_STAGES.map(stage => {
                 const count = counts[stage.status]
                 if (!count) return null

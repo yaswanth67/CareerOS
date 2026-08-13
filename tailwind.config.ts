@@ -2,10 +2,6 @@ import type { Config } from 'tailwindcss'
 import typography from '@tailwindcss/typography'
 
 const config: Config = {
-  // Class-driven, not media-driven. ThemeProvider writes `light`/`dark` onto
-  // <html>; with Tailwind's default ('media') every `dark:` utility followed the
-  // OS instead, so switching to light flipped the CSS-variable surfaces to white
-  // while the utilities stayed dark — white cards with unreadable pale text.
   darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -15,37 +11,58 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Warm neutrals, overriding Tailwind's default `gray` — which is a COOL
-        // gray (gray-900 is #111827: 17 red against 39 blue). Every dark surface
-        // in the app is a `gray-*` class, so the default scale is what made the
-        // dark theme read blue under a burgundy brand. These carry a faint mauve
-        // cast instead, so the neutrals sit under the brand rather than fighting
-        // it. Overriding here means no component sweep — every existing
-        // `dark:bg-gray-800` warms up on its own.
-        gray: {
-          50: '#faf8f9',
-          100: '#f4f0f1',
-          200: '#e8e0e3',
-          300: '#d3c8cc',
-          400: '#a2939a',
-          500: '#786a71',
-          600: '#574a51',
-          700: '#3a2f35',
-          800: '#241a1e',
-          900: '#160f12',
-          950: '#0f0a0c',
+        // Khaki Green — primary brand scale
+        khaki: {
+          50: '#f5f3ec',
+          100: '#dcd2be',
+          200: '#c3b9a0',
+          300: '#a5987c',
+          400: '#8b7d5c',
+          500: '#756845',
+          600: '#6b7355',
+          700: '#555b43',
+          800: '#464a38',
+          900: '#3a3d30',
+          950: '#1f2018',
         },
+        // Warm Off-White / Belgium Cream — light surfaces
+        belgium: {
+          50: '#fcf9f2',
+          100: '#f5efde',
+          200: '#ebe4d0',
+          300: '#ddd5bc',
+          400: '#ccc2a3',
+          500: '#b8ab87',
+          600: '#a0946e',
+          700: '#827857',
+          800: '#6b6247',
+          900: '#57503b',
+        },
+        // Antique Gold — accent & card backgrounds
+        gold: {
+          50: '#fdf8f0',
+          100: '#f5ebd7',
+          200: '#e8d5a8',
+          300: '#d9b970',
+          400: '#c49638',
+          500: '#b08430',
+          600: '#966e28',
+          700: '#7a5821',
+          800: '#63471e',
+          900: '#503a1a',
+        },
+        // Semantic aliases for existing components
         primary: {
-          50: '#fdf2f4',
-          100: '#f9e4e7',
-          200: '#f2cdd3',
-          300: '#e8b0b9',
-          400: '#c9647c',
-          500: '#a02651',
-          600: '#7a1c3d',
-          700: '#63162f',
-          800: '#4a1024',
-          900: '#360b1a',
+          50: '#f5f3ec',
+          100: '#dcd2be',
+          200: '#c3b9a0',
+          300: '#a5987c',
+          400: '#8b7d5c',
+          500: '#756845',
+          600: '#6b7355',
+          700: '#555b43',
+          800: '#464a38',
+          900: '#3a3d30',
         },
         success: {
           50: '#f0fdf4',
@@ -68,6 +85,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Playfair Display', 'Georgia', 'serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

@@ -13,9 +13,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'rounded-xl border bg-white text-gray-950 shadow-sm dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700',
+      'rounded-xl border bg-white text-gray-950 shadow-sm',
       'transition-all duration-300 ease-out',
-      hover && 'hover:shadow-lg hover:-translate-y-1 hover:border-gray-300 dark:hover:border-gray-600',
+      hover && 'hover:shadow-lg hover:-translate-y-1 hover:border-belgium-300',
       animated && 'animate-in',
       animated && delay > 0 && `[animation-delay:${delay}ms]`,
       className
@@ -64,7 +64,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm text-gray-500 dark:text-gray-400', 'animate-in', className)}
+    className={cn('text-sm text-gray-500', 'animate-in', className)}
     style={{ animationDuration: '300ms', animationDelay: '100ms' }}
     {...props}
   />
@@ -103,9 +103,9 @@ export const InteractiveCard = React.forwardRef<HTMLDivElement, InteractiveCardP
     <div
       ref={ref}
       className={cn(
-        'rounded-xl border bg-white text-gray-950 shadow-sm dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700',
+        'rounded-xl border bg-white text-gray-950 shadow-sm',
         'transition-all duration-200 ease-out',
-        'hover:shadow-lg hover:-translate-y-1 hover:border-gray-300 dark:hover:border-gray-600',
+        'hover:shadow-lg hover:-translate-y-1 hover:border-belgium-300 dark:hover:border-khaki-600',
         'active:scale-[0.99] active:shadow-sm',
         pressed && 'scale-[0.99] shadow-sm',
         className

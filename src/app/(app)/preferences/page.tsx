@@ -118,7 +118,7 @@ function Toggle({
       onClick={() => onChange(!checked)}
       className={cn(
         'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/40',
-        checked ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+        checked ? 'bg-primary-600' : 'bg-belgium-200'
       )}
     >
       <span
@@ -142,12 +142,12 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="p-2 rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+      <span className="p-2 rounded-lg bg-primary-50 text-primary-600">
         <Icon className="w-4.5 h-4.5" />
       </span>
       <div>
-        <h2 className="font-semibold text-gray-900 dark:text-white text-sm">{title}</h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+        <h2 className="font-semibold text-khaki-900 text-sm">{title}</h2>
+        <p className="text-xs text-khaki-500">{description}</p>
       </div>
     </div>
   )
@@ -155,7 +155,7 @@ function SectionHeader({
 
 function SummaryChip({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium dark:bg-gray-700 dark:text-gray-300">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-belgium-100 text-khaki-700 text-xs font-medium">
       {label}
     </span>
   )
@@ -325,10 +325,10 @@ export default function PreferencesPage() {
               className="w-full max-w-3xl card shadow-2xl animate-in flex flex-col max-h-[90vh]"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between gap-3 p-5 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between gap-3 p-5 border-b border-gray-200 border-belgium-200">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Filter className="w-5 h-5 text-primary-600 dark:text-primary-300 shrink-0" />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  <Filter className="w-5 h-5 text-primary-600 shrink-0" />
+                  <h2 className="text-lg font-semibold text-khaki-900 truncate">
                     {editingId === ''
                       ? 'New target filter'
                       : `Editing "${filters.find(f => f.id === editingId)?.name ?? draft.name}"`}
@@ -337,7 +337,7 @@ export default function PreferencesPage() {
                 <button
                   type="button"
                   onClick={closeEditor}
-                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:bg-belgium-300 shrink-0"
                   aria-label="Close editor"
                 >
                   <X className="w-5 h-5" />
@@ -346,7 +346,7 @@ export default function PreferencesPage() {
 
               <div className="overflow-y-auto p-5 space-y-5">
               {error && (
-                <div className="flex items-start gap-2 rounded-lg bg-danger-50 dark:bg-danger-500/10 p-3 text-sm text-danger-600 dark:text-danger-400">
+                <div className="flex items-start gap-2 rounded-lg bg-danger-50 p-3 text-sm text-danger-600">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -393,7 +393,7 @@ export default function PreferencesPage() {
                               'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
                               selected
                                 ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                                : 'bg-belgium-100 text-khaki-700 hover:bg-belgium-200'
                             )}
                           >
                             {role.label}
@@ -412,8 +412,8 @@ export default function PreferencesPage() {
                     <div className="space-y-3.5 mt-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-900 dark:text-white text-sm">Remote only</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Only show remote positions</p>
+                          <p className="font-medium text-khaki-900 text-sm">Remote only</p>
+                          <p className="text-xs text-khaki-500">Only show remote positions</p>
                         </div>
                         <Toggle
                           id="remoteOnly"
@@ -423,8 +423,8 @@ export default function PreferencesPage() {
                       </div>
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-900 dark:text-white text-sm">Visa sponsorship</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Only companies confirmed to sponsor visas</p>
+                          <p className="font-medium text-khaki-900 text-sm">Visa sponsorship</p>
+                          <p className="text-xs text-khaki-500">Only companies confirmed to sponsor visas</p>
                         </div>
                         <Toggle
                           id="visaRequired"
@@ -493,7 +493,7 @@ export default function PreferencesPage() {
 
               </div>
 
-              <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 border-belgium-200">
                 <Button type="button" variant="secondary" onClick={closeEditor}>
                   Cancel
                 </Button>
@@ -518,9 +518,9 @@ export default function PreferencesPage() {
           {/* Saved filters */}
           {filters.length === 0 ? (
             <Card className="text-center py-12">
-              <Filter className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">No target filters yet</h3>
-              <p className="mt-1 text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+              <Filter className="w-16 h-16 text-belgium-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-khaki-900">No target filters yet</h3>
+              <p className="mt-1 text-khaki-500 max-w-md mx-auto">
                 Create your first filter to narrow the job feed to the roles and locations you
                 actually want.
               </p>
@@ -535,7 +535,7 @@ export default function PreferencesPage() {
                 <Card key={filter.id} className="p-4 card-hover">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                      <h3 className="font-semibold text-khaki-900 truncate">
                         {filter.name}
                       </h3>
                     </div>
@@ -584,7 +584,7 @@ export default function PreferencesPage() {
                       !filter.remoteOnly &&
                       !filter.visaRequired &&
                       filter.minSalary == null && (
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                        <span className="text-xs text-khaki-400">
                           No criteria — matches every job
                         </span>
                       )}
