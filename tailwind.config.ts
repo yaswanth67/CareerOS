@@ -2,6 +2,11 @@ import type { Config } from 'tailwindcss'
 import typography from '@tailwindcss/typography'
 
 const config: Config = {
+  // Class-driven, not media-driven. ThemeProvider writes `light`/`dark` onto
+  // <html>; with Tailwind's default ('media') every `dark:` utility followed the
+  // OS instead, so switching to light flipped the CSS-variable surfaces to white
+  // while the utilities stayed dark — white cards with unreadable pale text.
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -10,17 +15,37 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Warm neutrals, overriding Tailwind's default `gray` — which is a COOL
+        // gray (gray-900 is #111827: 17 red against 39 blue). Every dark surface
+        // in the app is a `gray-*` class, so the default scale is what made the
+        // dark theme read blue under a burgundy brand. These carry a faint mauve
+        // cast instead, so the neutrals sit under the brand rather than fighting
+        // it. Overriding here means no component sweep — every existing
+        // `dark:bg-gray-800` warms up on its own.
+        gray: {
+          50: '#faf8f9',
+          100: '#f4f0f1',
+          200: '#e8e0e3',
+          300: '#d3c8cc',
+          400: '#a2939a',
+          500: '#786a71',
+          600: '#574a51',
+          700: '#3a2f35',
+          800: '#241a1e',
+          900: '#160f12',
+          950: '#0f0a0c',
+        },
         primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
+          50: '#fdf2f4',
+          100: '#f9e4e7',
+          200: '#f2cdd3',
+          300: '#e8b0b9',
+          400: '#c9647c',
+          500: '#a02651',
+          600: '#7a1c3d',
+          700: '#63162f',
+          800: '#4a1024',
+          900: '#360b1a',
         },
         success: {
           50: '#f0fdf4',

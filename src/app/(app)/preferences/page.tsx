@@ -281,7 +281,7 @@ export default function PreferencesPage() {
   return (
     <div className="space-y-5">
       {/* Compact header */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary-600 via-primary-700 to-indigo-700 p-5 sm:p-6 text-white shadow-lg">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 p-5 sm:p-6 text-white shadow-lg">
         <div className="absolute -right-8 -top-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
         <div className="absolute right-16 bottom-0 w-20 h-20 bg-white/5 rounded-full blur-xl" />
         <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">

@@ -293,12 +293,10 @@ export function ResumeSuggestions() {
           </Button>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Scans the resume and proposes role titles. Calibrated to your profile level — senior / 5+
-          years titles are excluded. Click{' '}
+          Scans the resume and proposes role titles calibrated to your profile level. Click{' '}
           <span className="text-gray-600 dark:text-gray-400 font-medium">View jobs</span> on a
           suggestion to see real US postings for it, scored against your resume, each linking to the
-          employer&apos;s official application page. Each keyword can also be added to{' '}
-          <code>portals.yml</code> <code>title_filter.positive</code> to widen your next scan.
+          employer&apos;s official application page.
         </p>
       </div>
 

@@ -73,8 +73,13 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [tailorOpen, setTailorOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const score = job.match?.score || 0
-  const hasMatch = !!job.match
+  const score = job.match?.score ?? 0
+  const hasMatch = !!job.match && score > 0
+  const hasMatchDetails = Boolean(job.match) && (
+    (job.match?.reasoning?.trim()?.length ?? 0) > 0 ||
+    (job.match?.matchedSkills?.length ?? 0) > 0 ||
+    (job.match?.missingSkills?.length ?? 0) > 0
+  )
 
   // Remember the job the user is applying to, then ask "Have you applied?" when
   // they come back to this tab.
@@ -294,12 +299,14 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
           </div>
 
           {/* Match Details */}
-          {hasMatch && (
+          {hasMatch && hasMatchDetails && (
             <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                {job.match?.reasoning}
-              </p>
-              {job.match?.matchedSkills.length && (
+              {job.match?.reasoning?.trim() && (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {job.match.reasoning}
+                </p>
+              )}
+              {job.match && job.match.matchedSkills.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {job.match.matchedSkills.slice(0, 6).map((skill) => (
                     <Badge key={skill} variant="success" className="text-xs">
@@ -314,7 +321,7 @@ export function JobCard({ job, defaultResumeId, savedStatus, entranceDelay }: Jo
                   )}
                 </div>
               )}
-              {job.match?.missingSkills.length && (
+              {job.match && job.match.missingSkills.length > 0 && (
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   Missing: {job.match.missingSkills.slice(0, 4).join(', ')}
                   {job.match.missingSkills.length > 4 && '...'}

@@ -5,6 +5,7 @@ import { Target, Users, BookOpen, CheckCircle, ChevronLeft, ChevronRight, Refres
 import { format, subDays, addDays, startOfDay, isSameDay } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
+import { Button } from '@/components/ui/Button'
 
 interface DailyGoal {
   id: string
@@ -29,7 +30,6 @@ const GOAL_TYPES = [
     label: 'Applications',
     icon: Target,
     emoji: '🎯',
-    color: 'blue',
     targetKey: 'applicationsTarget' as const,
     completedKey: 'applicationsCompleted' as const,
   },
@@ -38,7 +38,6 @@ const GOAL_TYPES = [
     label: 'Networking',
     icon: Users,
     emoji: '🤝',
-    color: 'green',
     targetKey: 'networkingTarget' as const,
     completedKey: 'networkingCompleted' as const,
   },
@@ -47,7 +46,6 @@ const GOAL_TYPES = [
     label: 'Skill Learning',
     icon: BookOpen,
     emoji: '📚',
-    color: 'purple',
     targetKey: 'skillLearningTarget' as const,
     completedKey: 'skillLearningCompleted' as const,
   },
@@ -57,38 +55,19 @@ const GOAL_TYPES = [
 // in the source. Building names at runtime (`colors.text.replace('text-','bg-')`)
 // produced `bg-purple-700`, which was never compiled — the progress bar fill
 // rendered with no background and looked broken.
-const COLOR_CLASSES: Record<string, {
-  bg: string
-  chip: string
-  text: string
-  fill: string
-  border: string
-  ring: string
-}> = {
-  blue: {
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    chip: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-700 dark:text-blue-300',
-    fill: 'bg-blue-500',
-    border: 'border-blue-200 dark:border-blue-800',
-    ring: 'focus:ring-blue-500',
-  },
-  green: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    chip: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-700 dark:text-green-300',
-    fill: 'bg-green-500',
-    border: 'border-green-200 dark:border-green-800',
-    ring: 'focus:ring-green-500',
-  },
-  purple: {
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    chip: 'bg-purple-100 dark:bg-purple-900/30',
-    text: 'text-purple-700 dark:text-purple-300',
-    fill: 'bg-purple-500',
-    border: 'border-purple-200 dark:border-purple-800',
-    ring: 'focus:ring-purple-500',
-  },
+// All three cards use neutral surfaces with primary (blush/burgundy) progress fill;
+// the icon and goal name already identify the card, and the three hues fight the
+// status colours elsewhere on the page.
+// One neutral treatment for all three goals. The icon and the goal name already
+// say which card you're looking at, and three brand-adjacent hues competed with
+// the six application-status colours used elsewhere on the page. Every class is
+// a literal string — Tailwind only compiles what it can see in the source.
+const GOAL_STYLE = {
+  chip: 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300',
+  text: 'text-primary-600 dark:text-primary-300',
+  fill: 'bg-primary-500 dark:bg-primary-200',
+  border: 'border-primary-200 dark:border-primary-900/50',
+  ring: 'focus:ring-primary-500',
 }
 
 function GoalCard({
@@ -120,13 +99,13 @@ function GoalCard({
   const remaining = Math.max(0, target - completed)
 
   const Icon = goal.icon
-  const colors = COLOR_CLASSES[goal.color]
+  const colors = GOAL_STYLE
 
   return (
-    <div className={cn('card p-4 relative overflow-hidden', colors.bg, colors.border)}>
+    <div className={cn('card p-4 relative overflow-hidden', colors.border)}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0 relative z-10">
-          <div className={cn('p-2.5 rounded-xl shrink-0', colors.chip, colors.text)}>
+          <div className={cn('p-2.5 rounded-xl shrink-0', colors.chip)}>
             <Icon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
@@ -356,7 +335,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
     return (
       <div className="card p-6">
         <div className="flex items-center justify-center h-32">
-          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin dark:border-primary-200" />
         </div>
       </div>
     )
@@ -397,7 +376,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {isToday ? 'Today' : format(currentDate, 'EEEE, MMMM d, yyyy')}
               </p>
-              {isToday && <span className="badge bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400 text-xs">Today</span>}
+              {isToday && <span className="badge bg-primary-100 text-primary-600 dark:bg-primary-200/30 dark:text-primary-200 text-xs">Today</span>}
             </div>
             <button
               onClick={goToNextDay}
@@ -416,17 +395,13 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
                 <span className="text-xs">day streak</span>
               </div>
             )}
-            <button
+            <Button
+              variant={isToday ? 'primary' : 'secondary'}
+              size="sm"
               onClick={goToToday}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                isToday
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
-              )}
             >
               Today
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -434,7 +409,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <span className="font-medium text-gray-900 dark:text-white">Overall Progress</span>
-            <span className={cn('font-bold', allComplete ? 'text-green-600 dark:text-green-400' : 'text-primary-600 dark:text-primary-400')}>
+            <span className={cn('font-bold', allComplete ? 'text-green-600 dark:text-green-400' : 'text-primary-600 dark:text-primary-300')}>
               {overallProgress}%
             </span>
           </div>
@@ -442,7 +417,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
             <div
               className={cn(
                 'h-full rounded-full transition-all duration-500',
-                allComplete ? 'bg-green-500' : 'bg-primary-500'
+                allComplete ? 'bg-green-500' : 'bg-primary-500 dark:bg-primary-200'
               )}
               style={{ width: `${overallProgress}%` }}
             />

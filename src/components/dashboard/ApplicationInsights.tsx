@@ -36,7 +36,7 @@ interface ApplicationInsightsProps {
 
 const FUNNEL_STAGES: { status: AppStatus; label: string; color: string }[] = [
   { status: 'SAVED', label: 'Saved', color: 'bg-gray-400 dark:bg-gray-500' },
-  { status: 'APPLIED', label: 'Applied', color: 'bg-sky-500' },
+  { status: 'APPLIED', label: 'Applied', color: 'bg-primary-500' },
   { status: 'INTERVIEWING', label: 'Interviewing', color: 'bg-amber-500' },
   { status: 'OFFER', label: 'Offer', color: 'bg-emerald-500' },
 ]

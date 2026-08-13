@@ -84,7 +84,7 @@ function scoreTextColor(score: number): string {
 
 function scoreBarColor(score: number): string {
   if (score >= 80) return 'bg-emerald-500'
-  if (score >= 60) return 'bg-sky-500'
+  if (score >= 60) return 'bg-primary-500'
   if (score >= 40) return 'bg-amber-500'
   return 'bg-gray-400'
 }
@@ -140,8 +140,13 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
   const scrollRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
 
-  const score = currentJob.match?.score || 0
-  const hasMatch = !!currentJob.match
+  const score = currentJob.match?.score ?? 0
+  const hasMatch = !!currentJob.match && score > 0
+  const hasMatchDetails = Boolean(currentJob.match) && (
+    (currentJob.match?.reasoning?.trim()?.length ?? 0) > 0 ||
+    (currentJob.match?.matchedSkills?.length ?? 0) > 0 ||
+    (currentJob.match?.missingSkills?.length ?? 0) > 0
+  )
 
   const loadSimilar = useCallback(async (jobId: string) => {
     setSimilarLoading(true)
@@ -398,7 +403,7 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
           </div>
 
           {/* Match panel */}
-          {hasMatch && (
+          {hasMatch && hasMatchDetails && (
             <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <div className="flex-1">
@@ -416,8 +421,10 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
                   </div>
                 </div>
               </div>
-              <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{currentJob.match?.reasoning}</p>
-              {!!currentJob.match?.matchedSkills.length && (
+              {currentJob.match?.reasoning?.trim() && (
+                <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{currentJob.match.reasoning}</p>
+              )}
+              {currentJob.match && currentJob.match.matchedSkills.length > 0 && (
                 <div className="mt-3">
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                     You match on these skills
@@ -429,7 +436,7 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
                   </div>
                 </div>
               )}
-              {!!currentJob.match?.missingSkills.length && (
+              {currentJob.match && currentJob.match.missingSkills.length > 0 && (
                 <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
                   <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1.5">
                     Gaps worth addressing before applying
@@ -586,7 +593,7 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{s.company}</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                       {s.isRemote ? 'Remote' : s.location}
-                      {s.matchScore !== null && ` · ${s.matchScore}% match`}
+                      {s.matchScore !== null && s.matchScore > 0 && ` · ${s.matchScore}% match`}
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
