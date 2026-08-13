@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2, ChevronDown, Copy, Loader2, Search, Sparkles, Share2 } from 'lucide-react'
-import { Badge } from '@/components/ui/Badge'
+import { ChevronDown, Loader2, RefreshCw, Search, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
@@ -21,7 +20,6 @@ import {
 
 interface RoleSuggestion {
   title: string
-  axis: 'Lateral' | 'Stretch' | 'Pivot'
   cvEvidence: string
   gapNote: string
   marketNote: string
@@ -45,12 +43,6 @@ interface ResumesApiResponse {
   error?: string
 }
 
-const AXIS_STYLE: Record<RoleSuggestion['axis'], { badge: 'success' | 'warning' | 'info'; label: string }> = {
-  Lateral: { badge: 'success', label: 'Lateral — same work, new label' },
-  Stretch: { badge: 'warning', label: 'Stretch — one level up' },
-  Pivot: { badge: 'info', label: 'Pivot — adjacent function' },
-}
-
 /**
  * Scan the user's resume and propose adjacent job titles at their recorded
  * level (career-ops `titles` mode). Level-calibrated: senior / 5+ years titles
@@ -69,6 +61,7 @@ export function ResumeSuggestions() {
   const [suggestions, setSuggestions] = useState<RoleSuggestion[]>([])
   const [markdown, setMarkdown] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [isReportOpen, setIsReportOpen] = useState(false)
   // Which suggestion has its real-job list open. One at a time keeps the page
   // short and means only one query is in flight.
   const [openJobsFor, setOpenJobsFor] = useState<string | null>(null)
@@ -319,32 +312,38 @@ export function ResumeSuggestions() {
     }
   }
 
-  const handleCopyKeyword = async (keyword: string) => {
-    try {
-      await navigator.clipboard.writeText(keyword)
-      setCopied(keyword)
-      setTimeout(() => setCopied(null), 1500)
-      toast({ type: 'success', message: `Keyword copied: ${keyword}` })
-    } catch {
-      toast({ type: 'error', message: 'Could not copy. Select and copy manually.' })
-    }
-  }
+  const [refreshCounters, setRefreshCounters] = useState<Record<string, number>>({})
+  const [refreshingTitles, setRefreshingTitles] = useState<Record<string, boolean>>({})
 
-  const handleRefer = async (suggestion: RoleSuggestion) => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-    const referUrl = `${baseUrl}/ai?tab=evaluate&keyword=${encodeURIComponent(suggestion.keyword)}&title=${encodeURIComponent(suggestion.title)}`
-    try {
-      await navigator.clipboard.writeText(referUrl)
-      setCopied(suggestion.keyword)
-      setTimeout(() => setCopied(null), 1500)
-      toast({ type: 'success', message: 'Referral link copied!' })
-    } catch {
-      toast({ type: 'error', message: 'Could not copy. Select and copy manually.' })
-    }
+  const handleRefreshStateChange = useCallback((title: string, refreshing: boolean) => {
+    setRefreshingTitles(prev => {
+      if (prev[title] === refreshing) return prev
+      return { ...prev, [title]: refreshing }
+    })
+  }, [])
+
+  const triggerFreshListings = (title: string) => {
+    if (refreshingTitles[title]) return
+    setOpenJobsFor(title)
+    setRefreshCounters(prev => ({
+      ...prev,
+      [title]: (prev[title] ?? 0) + 1,
+    }))
   }
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
+      {markdown && !loading && (
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => setIsReportOpen(true)}
+          className="absolute right-0 -top-[50px] w-[231px]"
+        >
+          Full report
+        </Button>
+      )}
+
       {/* Scanner controls */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -370,10 +369,12 @@ export function ResumeSuggestions() {
               ))}
             </select>
           </div>
-          <Button onClick={() => handleScan(false)} isLoading={loading} disabled={loading} className="sm:shrink-0">
-            {!loading && <Sparkles className="w-4 h-4 mr-1.5" aria-hidden="true" />}
-            {loading ? 'Scanning…' : 'Scan resume & suggest roles'}
-          </Button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:ml-auto sm:shrink-0">
+            <Button onClick={() => handleScan(false)} isLoading={loading} disabled={loading} className="sm:shrink-0">
+              {!loading && <Sparkles className="w-4 h-4 mr-1.5" aria-hidden="true" />}
+              {loading ? 'Scanning…' : 'Scan resume & suggest roles'}
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500">
           Job titles worth searching for, based on your resume — matched to your level, so senior
@@ -442,7 +443,6 @@ export function ResumeSuggestions() {
           {suggestions.length > 0 ? (
             <div className="space-y-2">
               {suggestions.map((s, i) => {
-                const axis = AXIS_STYLE[s.axis] || AXIS_STYLE.Lateral
                 const jobsOpen = openJobsFor === s.title
                 return (
                   <div
@@ -454,7 +454,6 @@ export function ResumeSuggestions() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-medium text-gray-900 dark:text-white">{s.title}</h3>
-                        <Badge variant={axis.badge}>{axis.label}</Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
@@ -477,41 +476,17 @@ export function ResumeSuggestions() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRefer(s)}
-                          disabled={loading}
+                          onClick={() => triggerFreshListings(s.title)}
+                          disabled={loading || Boolean(refreshingTitles[s.title])}
+                          className={jobsOpen ? 'opacity-100' : ''}
                         >
-                          {copied === s.keyword ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 mr-1.5 text-success-500" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Share2 className="w-4 h-4 mr-1.5" />
-                              Refer
-                            </>
-                          )}
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 mr-1.5 ${refreshingTitles[s.title] ? 'animate-spin' : ''}`}
+                            aria-hidden="true"
+                          />
+                          {refreshingTitles[s.title] ? 'Fetching fresh listings…' : 'Fetch fresh listings'}
                         </Button>
                       </div>
-                    </div>
-                    {s.cvEvidence && (
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-                        CV evidence: “{s.cvEvidence}”
-                      </p>
-                    )}
-                    <div className="mt-2 grid sm:grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300">
-                      {s.gapNote && (
-                        <div>
-                          <span className="font-medium text-gray-900 dark:text-white">Gap note: </span>
-                          {s.gapNote}
-                        </div>
-                      )}
-                      {s.marketNote && (
-                        <div>
-                          <span className="font-medium text-gray-900 dark:text-white">Market: </span>
-                          {s.marketNote}
-                        </div>
-                      )}
                     </div>
 
                     {/* Real US postings for this role, with official apply links. */}
@@ -520,6 +495,8 @@ export function ResumeSuggestions() {
                         keyword={s.keyword}
                         resumeId={selectedResumeId || undefined}
                         initialJobs={jobsCache.get(cacheKey(s.keyword, selectedResumeId)) || []}
+                        refreshToken={refreshCounters[s.title] ?? 0}
+                        onRefreshStateChange={(refreshing) => handleRefreshStateChange(s.title, refreshing)}
                         onJobsFetched={(jobs) => {
                           setJobsCache((prev) => {
                             const next = new Map(prev)
@@ -541,18 +518,23 @@ export function ResumeSuggestions() {
             </div>
           )}
 
-          {/* Full markdown output */}
-          {markdown && (
-            <details className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <summary className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white cursor-pointer select-none bg-gray-50 dark:bg-gray-800">
-                Full report
-              </summary>
-              <div className="p-4">
-                <CareerOpsMarkdown markdown={markdown} />
-              </div>
-            </details>
-          )}
         </>
+      )}
+
+      {isReportOpen && markdown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl max-h-[80vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Full report</h3>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setIsReportOpen(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="overflow-y-auto p-4 max-h-[70vh]">
+              <CareerOpsMarkdown markdown={markdown} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

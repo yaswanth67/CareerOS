@@ -251,21 +251,21 @@ export function ApplicationCalendar({ year: initialYear, month: initialMonth, on
               key={day.date}
               onClick={() => handleDayClick(day)}
               className={cn(
-                'relative aspect-square rounded-lg p-1.5 transition-all',
+                'relative h-11 rounded-lg transition-all',
                 'flex flex-col items-center justify-center',
                 day.isCurrentMonth
                   ? 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700'
                   : 'bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800',
                 day.isToday && 'ring-2 ring-primary-500',
                 selectedDate === day.date && 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900',
-                day.hasApplications && 'cursor-pointer hover:shadow-md',
+                day.hasApplications && 'cursor-pointer hover:border-primary-300 dark:hover:border-primary-700',
                 !day.isCurrentMonth && 'text-gray-300 dark:text-gray-600'
               )}
               disabled={!day.isCurrentMonth}
               aria-label={`${day.date}: ${day.counts.total} application${day.counts.total !== 1 ? 's' : ''}`}
             >
               <span className={cn(
-                'text-sm font-medium',
+                'text-sm font-medium leading-none -mt-0.5',
                 day.isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white',
                 !day.isCurrentMonth && 'text-gray-300 dark:text-gray-600'
               )}>
@@ -276,7 +276,7 @@ export function ApplicationCalendar({ year: initialYear, month: initialMonth, on
               {day.isCurrentMonth && day.counts.total > 0 && (
                 <div
                   className={cn(
-                    'absolute bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full',
+                    'absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full',
                     getIntensityColor(day.counts.total)
                   )}
                   title={`${day.counts.total} application${day.counts.total !== 1 ? 's' : ''}`}
@@ -287,7 +287,7 @@ export function ApplicationCalendar({ year: initialYear, month: initialMonth, on
               {day.isCurrentMonth && day.dominantStatus && day.counts.total > 0 && (
                 <div
                   className={cn(
-                    'absolute top-1 right-1 w-1.5 h-1.5 rounded-full',
+                    'absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full',
                     STATUS_COLORS[day.dominantStatus]
                   )}
                   title={STATUS_LABELS[day.dominantStatus]}

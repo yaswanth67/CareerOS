@@ -18,7 +18,7 @@ export default async function AnalyticsPage() {
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
         <Suspense fallback={<DashboardSkeleton />}>
           <ApplicationCalendar />
         </Suspense>

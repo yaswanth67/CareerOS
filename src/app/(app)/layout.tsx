@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Logo } from '@/components/ui/Logo'
 import { GlobalHeader } from '@/components/layout/GlobalHeader'
 import { NavLinks } from '@/components/layout/NavLinks'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export default function AppLayout({
   children,
@@ -54,6 +55,13 @@ export default function AppLayout({
         <NavLinks onNavigate={() => setSidebarOpen(false)} />
 
         <div className="mt-auto p-4 border-t border-gray-200 dark:border-gray-700">
+          {/* Theme switcher. The provider and toggle existed but were never
+              mounted, so light mode was unreachable from the UI. */}
+          <div className="flex items-center justify-between gap-2 px-3 pb-3">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Theme</span>
+            <ThemeToggle />
+          </div>
+
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
               <User className="w-5 h-5 text-primary-600 dark:text-primary-400" />

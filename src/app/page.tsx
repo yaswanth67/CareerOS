@@ -19,10 +19,10 @@ export default function HomePage() {
   }, [session, status, router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 dark:from-primary-800 dark:via-primary-900 dark:to-gray-950">
       <div className="animate-pulse-soft flex flex-col items-center gap-4">
         <Logo size="lg" />
-        <span className="text-sm text-gray-500 dark:text-gray-400">Loading your matches...</span>
+        <span className="text-sm font-medium text-primary-100/90 dark:text-primary-200/80">Loading your matches...</span>
       </div>
     </div>
   )

@@ -32,7 +32,7 @@ export function formatRelativeTime(date: Date | string): string {
 export function getScoreColor(score: number): string {
   if (score >= 80) return 'text-success-600 bg-success-100 dark:bg-success-500/20 dark:text-success-400'
   if (score >= 60) return 'text-warning-600 bg-warning-100 dark:bg-warning-500/20 dark:text-warning-400'
-  return 'text-danger-600 bg-danger-100 dark:bg-danger-500/20 dark:text-danger-400'
+  return 'text-gray-600 bg-gray-100 dark:bg-gray-500/20 dark:text-gray-400'
 }
 
 export function getScoreLabel(score: number): string {

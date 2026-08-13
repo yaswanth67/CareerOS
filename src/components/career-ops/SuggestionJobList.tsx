@@ -49,6 +49,10 @@ interface SuggestionJobListProps {
   initialJobs?: SuggestionJob[]
   /** Callback when jobs are fetched (to update parent cache). */
   onJobsFetched?: (jobs: SuggestionJob[]) => void
+  /** Optional refresh trigger to force a fresh fetch. */
+  refreshToken?: number
+  /** Called when a manual refresh is in flight so the button can lock while the request is active. */
+  onRefreshStateChange?: (refreshing: boolean) => void
 }
 
 /** Where a posting lives, so the user can see it is the company's own board. */
@@ -81,6 +85,8 @@ export function SuggestionJobList({
   resumeId,
   initialJobs,
   onJobsFetched,
+  refreshToken,
+  onRefreshStateChange,
 }: SuggestionJobListProps) {
   const { toast } = useToast()
   const [jobs, setJobs] = useState<SuggestionJob[]>(initialJobs || [])
@@ -97,10 +103,15 @@ export function SuggestionJobList({
 
   const load = useCallback(
     async (refresh = false) => {
-      if (refresh) setRefreshing(true)
-      else setLoading(true)
+      if (refresh) {
+        setRefreshing(true)
+        onRefreshStateChange?.(true)
+        setNotice('Refreshing live listings…')
+      } else {
+        setLoading(true)
+        setNotice(null)
+      }
       setError(null)
-      setNotice(null)
 
       // A live provider sweep pulls whole job boards, so it needs a long
       // ceiling; the plain DB query returns in milliseconds.
@@ -129,6 +140,8 @@ export function SuggestionJobList({
             `Live refresh: ${data.refreshed.jobsNew} new US postings added, ` +
             `${data.refreshed.jobsSkippedNonUs} non-US postings skipped.`
           )
+        } else if (refresh) {
+          setNotice('Fresh listings check complete — no new US postings were found.')
         }
       } catch (err) {
         const aborted = err instanceof DOMException && err.name === 'AbortError'
@@ -137,18 +150,27 @@ export function SuggestionJobList({
         clearTimeout(timeoutId)
         setLoading(false)
         setRefreshing(false)
+        onRefreshStateChange?.(false)
       }
     },
-    [keyword, resumeId, onJobsFetched]
+    [keyword, resumeId, onJobsFetched, onRefreshStateChange]
   )
 
   useEffect(() => {
-    // Only auto-fetch if no initial jobs were provided
-    if (!initialJobs) {
+    // Auto-fetch when there are no initial jobs yet. An empty array is still a
+    // valid "not loaded yet" state, so we must trigger on length-0 rather than
+    // treating [] as a loaded payload.
+    if (!initialJobs || initialJobs.length === 0) {
       const timer = setTimeout(() => load(false), 0)
       return () => clearTimeout(timer)
     }
   }, [load, initialJobs])
+
+  useEffect(() => {
+    if (refreshToken && refreshToken > 0) {
+      load(true)
+    }
+  }, [load, refreshToken])
 
   /**
    * Save a posting to the tracker as SAVED, which is what puts it on the
@@ -331,18 +353,6 @@ export function SuggestionJobList({
         </ul>
       )}
 
-      <div className="flex items-center justify-between gap-2 pt-0.5">
-        <p className="text-[11px] text-gray-400 dark:text-gray-500">
-          US postings only, scored against your resume.
-        </p>
-        <Button variant="ghost" size="sm" onClick={() => load(true)} disabled={refreshing}>
-          <RefreshCw
-            className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`}
-            aria-hidden="true"
-          />
-          {refreshing ? 'Fetching from job boards…' : 'Fetch fresh listings'}
-        </Button>
-      </div>
     </div>
   )
 }
