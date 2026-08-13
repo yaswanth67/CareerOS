@@ -274,7 +274,7 @@ export class CompanyDirectProvider extends BaseJobProvider {
     try {
       const response = await fetch(company.url, {
         headers: {
-          'User-Agent': 'Prose AI Bot',
+          'User-Agent': 'CareerOS AI Bot',
           'Accept': 'application/json',
         },
         signal: AbortSignal.timeout(10000),

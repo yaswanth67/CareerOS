@@ -273,7 +273,7 @@ export class AshbyProvider extends BaseJobProvider {
       const url = `https://api.ashbyhq.com/posting-api/job-board/${board}`
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Prose AI Bot',
+          'User-Agent': 'CareerOS AI Bot',
           'Accept': 'application/json',
         },
         signal: AbortSignal.timeout(10000),

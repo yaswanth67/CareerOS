@@ -1,11 +1,11 @@
-# Prose — Overall Flow & Feature Guide
+# CareerOS — Overall Flow & Feature Guide
 
-This document explains what Prose does, how the pieces fit together, and — most
+This document explains what CareerOS does, how the pieces fit together, and — most
 importantly — **where your resume is used** at every step.
 
-## 1. What Prose is
+## 1. What CareerOS is
 
-Prose is a personal job-search assistant. It:
+CareerOS is a personal job-search assistant. It:
 
 1. **Fetches live job listings** from public job APIs (Greenhouse, Ashby, Lever,
    and direct company career APIs like Amazon — plus remote job boards Remotive,
@@ -122,7 +122,7 @@ The scheduled cron runs the same check over the full database every 6h. Bot-bloc
 
 ## 3. Where your resume is used
 
-The resume is the **single most important input** in Prose. It is used in four places:
+The resume is the **single most important input** in CareerOS. It is used in four places:
 
 ### 3.1 Resume upload & parsing — `src/lib/resume-parser/index.ts`
 

@@ -297,7 +297,7 @@ export class GreenhouseProvider extends BaseJobProvider {
       const url = `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Prose AI Bot',
+          'User-Agent': 'CareerOS AI Bot',
         },
         // No `next: { revalidate }` here: route handlers can't cache responses
         // over 2MB (some Greenhouse boards exceed this), which throws.

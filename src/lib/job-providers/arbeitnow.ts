@@ -21,7 +21,7 @@ export class ArbeitnowProvider extends BaseJobProvider {
     const jobs: RawJob[] = []
     try {
       const response = await fetch('https://www.arbeitnow.com/api/job-board-api', {
-        headers: { 'User-Agent': 'Prose AI Bot' },
+        headers: { 'User-Agent': 'CareerOS AI Bot' },
         signal: AbortSignal.timeout(15000),
       })
 

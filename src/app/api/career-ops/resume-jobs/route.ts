@@ -45,6 +45,68 @@ function keywordsFromResume(resume: { skills: string; roleType: string; title: s
   return skills.slice(0, 12)
 }
 
+/**
+ * Words too generic to identify a role on their own. Kept out of the widened
+ * fallbacks so "ETL Developer" doesn't degrade into every "Developer" posting.
+ */
+const GENERIC_ROLE_WORDS = new Set([
+  'engineer', 'engineering', 'developer', 'analyst', 'manager', 'specialist',
+  'lead', 'senior', 'junior', 'staff', 'principal', 'associate', 'i', 'ii', 'iii',
+])
+
+/**
+ * Conditions matching a suggested role title, widened only as far as needed.
+ *
+ * A suggestion is a *role title*, not a search query — the model proposes
+ * things like "Data Pipeline Engineer" that no posting is worded exactly that
+ * way. Matching the phrase verbatim (the original behaviour) returned zero jobs
+ * for those, which surfaced as an empty, broken-looking list. Measured against
+ * the current database: "Data Pipeline Engineer" 0 hits, "ETL Developer" 0.
+ *
+ * So try progressively looser rungs and stop at the first that matches:
+ *
+ *   1. the phrase itself, in title or skills — most precise
+ *   2. any ordered pair of its words in the title — this is what rescues
+ *      "Data Pipeline Engineer", whose first+last pair is "data engineer" (45)
+ *   3. every distinctive word present somewhere (title or skills) — rescues
+ *      "ETL Developer" via "etl" (3)
+ *
+ * Stopping at the first non-empty rung keeps precision: a keyword that matches
+ * exactly never gets widened, so good matches are never diluted by loose ones.
+ */
+async function matchConditionsForKeyword(keyword: string): Promise<Prisma.JobWhereInput[]> {
+  const words = keyword.toLowerCase().split(/\s+/).filter(Boolean)
+  const distinctive = words.filter(w => !GENERIC_ROLE_WORDS.has(w))
+
+  const pairs: string[] = []
+  for (let a = 0; a < words.length; a++) {
+    for (let b = a + 1; b < words.length; b++) pairs.push(`${words[a]} ${words[b]}`)
+  }
+
+  const rungs: Prisma.JobWhereInput[][] = [
+    [{ title: { contains: keyword } }, { skills: { contains: keyword } }],
+    pairs.map(pair => ({ title: { contains: pair } })),
+    distinctive.length
+      ? [{
+          AND: distinctive.map(word => ({
+            OR: [{ title: { contains: word } }, { skills: { contains: word } }],
+          })),
+        }]
+      : [],
+  ]
+
+  for (const rung of rungs) {
+    if (rung.length === 0) continue
+    const hits = await prisma.job.count({
+      where: { isActive: true, ...US_ONLY_WHERE, OR: rung },
+    })
+    if (hits > 0) return rung
+  }
+
+  // Nothing in the database for this role yet — the UI offers a live fetch.
+  return []
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -80,12 +142,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Candidate pool: active US jobs whose title or skills mention a keyword.
-    // `skills` is a JSON string column, so `contains` searches it directly.
-    const keywordConditions: Prisma.JobWhereInput[] = keywords.flatMap(kw => [
-      { title: { contains: kw } },
-      { skills: { contains: kw } },
-    ])
+    // Candidate pool: active US jobs matching each keyword, widened one rung at
+    // a time until something matches (see matchConditionsForKeyword).
+    const perKeyword = await Promise.all(keywords.map(kw => matchConditionsForKeyword(kw)))
+    const keywordConditions: Prisma.JobWhereInput[] = perKeyword.flat()
 
     const where: Prisma.JobWhereInput = {
       isActive: true,

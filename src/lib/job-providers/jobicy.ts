@@ -21,7 +21,7 @@ export class JobicyProvider extends BaseJobProvider {
     const jobs: RawJob[] = []
     try {
       const response = await fetch('https://jobicy.com/api/v2/remote-jobs?count=100', {
-        headers: { 'User-Agent': 'Prose AI Bot' },
+        headers: { 'User-Agent': 'CareerOS AI Bot' },
         signal: AbortSignal.timeout(15000),
       })
 
