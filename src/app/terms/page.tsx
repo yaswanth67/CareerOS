@@ -23,7 +23,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">1. Acceptance of Terms</h2>
             <p>
-              By creating an account or using Prose, you agree to these Terms of Service. If you do not
+              By creating an account or using CareerOS, you agree to these Terms of Service. If you do not
               agree, please do not use the service.
             </p>
           </section>
@@ -31,7 +31,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">2. The Service</h2>
             <p>
-              Prose helps you find and compare job openings. It fetches public job listings from third-party
+              CareerOS helps you find and compare job openings. It fetches public job listings from third-party
               boards, parses resumes you upload, and uses AI to estimate how well each job matches your profile.
               The service is provided &ldquo;as is&rdquo; and may be used for personal, non-commercial purposes.
             </p>
@@ -49,7 +49,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">4. Your Content</h2>
             <p>
-              Resumes, preferences, and saved applications you upload or create remain yours. Prose stores
+              Resumes, preferences, and saved applications you upload or create remain yours. CareerOS stores
               them locally and does not share them with other users. You are responsible for the accuracy of
               any personal information you provide.
             </p>
@@ -58,7 +58,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">5. Third-Party Data</h2>
             <p>
-              Job listings come from public APIs and career pages owned by their respective companies. Prose
+              Job listings come from public APIs and career pages owned by their respective companies. CareerOS
               does not control, endorse, or guarantee the accuracy of those listings. Always verify application
               details on the employer&apos;s own site before applying.
             </p>
@@ -75,7 +75,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">7. Limitation of Liability</h2>
             <p>
-              To the fullest extent permitted by law, Prose and its developers are not liable for any direct,
+              To the fullest extent permitted by law, CareerOS and its developers are not liable for any direct,
               indirect, incidental, or consequential damages arising from your use of the service.
             </p>
           </section>

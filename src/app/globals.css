@@ -39,7 +39,20 @@
     --ring: 107 115 85;
 
     --radius: 0.75rem;
+    /* Mark-specific color vars: used by inline SVG mark to adapt to theme */
+    --mark-bg: 107 115 85; /* default: primary */
+    --mark-foreground: 252 249 242; /* default: primary-foreground */
+    --mark-accent: 212 168 67; /* accent/gold */
+    --mark-stroke: 45 40 35; /* dark stroke */
   }
+
+/* Dark mode overrides for the mark: invert tile so it stands out on dark pages */
+.dark {
+  --mark-bg: 252 249 242; /* cream tile on dark backgrounds */
+  --mark-foreground: 45 40 35; /* dark briefcase on cream tile */
+  --mark-accent: 212 168 67;
+  --mark-stroke: 252 249 242;
+}
 }
 
 * {
@@ -288,6 +301,19 @@ html {
 
   .slide-down {
     animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Prevent invisible white text on light backgrounds
+     When an element uses `text-white` but sits on a light background
+     (card / bg-white / belgium off-white), force it to the khaki-700
+     brand color so text remains legible. This targets only white text
+     that would otherwise disappear on light surfaces. */
+  .bg-white .text-white,
+  .card .text-white,
+  .bg-belgium-50 .text-white,
+  .bg-belgium-100 .text-white,
+  .bg-belgium-200 .text-white {
+    color: rgb(85 91 67) !important; /* text-khaki-700 */
   }
 
   @keyframes slideDown {

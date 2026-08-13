@@ -90,17 +90,19 @@ export function CountryDropdown({ availableCountries = [], selectedCountry: cont
               'text-sm font-medium transition-colors',
               'border-gray-300 dark:border-gray-600',
               'hover:border-primary-500 dark:hover:border-primary-500',
-              'focus:outline-none focus:ring-2 focus:ring-primary-500/20'
+              'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
+              'text-khaki-700 dark:text-gray-200'
             )}
             aria-haspopup="listbox"
             aria-expanded={isOpen}
           >
-            <span className="truncate block">
+            <span className="truncate block text-khaki-700 dark:text-gray-200">
               {selectedCountry || 'All Countries'}
             </span>
             <ChevronDown className={cn(
-              'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform',
-              isOpen && 'rotate-180'
+              'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-transform',
+              isOpen && 'rotate-180',
+              'text-khaki-700 dark:text-gray-300'
             )} />
           </button>
 
