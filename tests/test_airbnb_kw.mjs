@@ -1,4 +1,0 @@
-import { detectSponsorshipKeyword } from './src/lib/job-fetcher/sponsorship.ts';
-
-const text = 'associate counsel, innovation and thought leadership airbnb div class= content-intro p span style= font-family: helvetica, arial, sans-serif; font-size: 12pt; airbnb was born in 2007 when two hosts welcomed three guests to their san francisco home, and has since grown to over 5 million hosts who have welcomed over 2 billion guest arrivals in almost every country across the globe. every day, hosts offer unique stays and experiences that make it possible for guests to connect with communities in a';
-console.log('Keyword result:', detectSponsorshipKeyword(text));

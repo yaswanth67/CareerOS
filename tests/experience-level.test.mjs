@@ -100,5 +100,18 @@ else { failed++; console.error(`  FAIL one-up (${senior}) must beat two-up (${st
 if (scores.get('staff').reasoning.includes('well above your level')) passed++
 else { failed++; console.error(`  FAIL staff reasoning should name the gap, got: ${scores.get('staff').reasoning}`) }
 
+
+// --- Regression: employment type must never shadow the job title -------------
+// Ashby sent `employmentType` ("FullTime"), Remotive/Arbeitnow sent `job_type`
+// ("full_time") in the seniority field. Those classify to MID, and because the
+// explicit field was preferred over the title, every posting from those boards
+// was flattened to mid-level whatever it was actually called.
+console.log('Employment type carries no seniority signal')
+check('FullTime', 'MID')
+check('full_time', 'MID')
+check('Contract', 'MID')
+check('PartTime', 'MID')
+check('Temporary', 'MID')
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed === 0 ? 0 : 1)

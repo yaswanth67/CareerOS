@@ -95,7 +95,7 @@ Scoring is a fast heuristic (`src/lib/ai-matcher`) — thousands of jobs in well
 | Role alignment | 20% | Resume text vs the job's role type |
 | **Seniority fit** | 15% | Your level vs the job's level |
 
-**Seniority is the part worth understanding.** A job's level comes from its title (`src/lib/job-providers/experience-level.ts`) — before that it came from a field almost no board sends, so 99% of postings defaulted to `MID` and "Staff Frontend Engineer" ranked as mid-level. Your own level is inferred from your resume: stated years of experience first, then held titles, defaulting to `MID` when neither appears.
+**Seniority is the part worth understanding.** A job's level comes from its title (`src/lib/job-providers/experience-level.ts`) — before that it came from a field almost no board sends, so 99% of postings defaulted to `MID` and "Staff Frontend Engineer" ranked as mid-level. A provider's own field is used only when it carries a real signal: Ashby, Remotive and Arbeitnow put an *employment* type there ("FullTime", "full_time"), which classifies to `MID` and used to shadow the title, silently re-flattening every posting from those boards. Your own level is inferred from your resume: stated years of experience first, then held titles, defaulting to `MID` when neither appears.
 
 Scores then scale down for roles above your level (×0.9 one level up, ×0.75 two, ×0.6 beyond), so an out-of-reach posting stays visible but cannot outrank a comparable role you could actually get. Each card explains the verdict — *"Seniority (MID): matches your level"* or *"well above your level"*.
 
@@ -554,13 +554,19 @@ npm run check-links:fix           # …and deactivate the broken ones
 
 ### Tests
 
-Node-run assertion suites under `tests/` — no runner or framework, just `npx tsx`:
+Three assertion suites under `tests/`, run directly with `npx tsx` — no runner, no framework:
 
 ```bash
 npx tsx tests/us-location.test.mjs        # 95 assertions — US classifier
-npx tsx tests/experience-level.test.mjs   # 33 — seniority parsing + level-aware ranking
+npx tsx tests/experience-level.test.mjs   # 38 — seniority parsing + level-aware ranking
 npx tsx tests/job-dedup.test.mjs          # 20 — company normalization + duplicate detection
 ```
+
+153 assertions total, all passing. `tests/` previously also held ~37 files that
+were either copies of career-ops' own suites (which live and pass in
+`career-ops/`, next to the modules they test) or one-off debug scripts with
+stale import paths — every one of them threw on start. They were removed rather
+than left to look like coverage.
 
 ---
 
@@ -578,7 +584,8 @@ npx tsx tests/job-dedup.test.mjs          # 20 — company normalization + dupli
 | Resume scan spins forever, then times out | The generation is slower than the browser's abort. A scan legitimately takes **4–6 minutes**; the elapsed counter tells you it's alive. If it always times out, your proxy is unusually slow — raise `CLIENT_ABORT_MS` and `SDK_TIMEOUT_MS` together in `src/lib/career-ops/timeouts.ts`, keeping the client below the SDK. |
 | Career Ops call fails instantly with a 401 / "model not supported" | The proxy resolved `ANTHROPIC_MODEL` to a provider that is out of quota. Probe it directly (`curl` test above) and read the `diagnostics.attemptOrder` in the error — then point `ANTHROPIC_MODEL` at a model your proxy actually serves. |
 | Best Matches is full of Senior / Staff roles | Stored seniority is stale. Run `npm run reclassify:levels -- --apply --rescore`. |
-| Prisma error: "Unknown field `companySlug`" | A long-running `next dev` is holding a Prisma client generated before the last schema change. Restart the dev server (`npx prisma generate` first if needed). |
+| A button renders as a solid colour block with no label | A global CSS rule is repainting its label. `globals.css` once carried `.card .text-white { color: khaki-700 !important }`, which hit every button that paints its own dark background and made label and background the same colour (1.00:1). Don't re-add a blanket `.text-white` override — fix the offending element's own classes instead. |
+| Prisma error: "Unknown field `companySlug`" or `applicationsAdjustment` | Either the schema was never pushed to SQLite (`npx prisma db push`) or a long-running `next dev` is holding a client generated before the change. Push, then restart the dev server — the running process caches the old client. |
 | Prisma error "Argument `targetRoles` must not be an array" | SQLite arrays must be JSON strings — use `stringifyJsonArray` on write (see the preferences route). |
 | Reset the DB | `rm prisma/dev.db && npm run db:push && npm run db:seed` |
 

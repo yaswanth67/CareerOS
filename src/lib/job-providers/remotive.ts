@@ -59,7 +59,7 @@ export class RemotiveProvider extends BaseJobProvider {
           description,
           requirements: [],
           skills: await this.extractSkills(`${job.title} ${job.tags?.join(' ') || ''} ${description}`),
-          experienceLevel: job.job_type || '',
+          experienceLevel: '', // job_type is full_time/contract, not a seniority
           roleType: job.category || '',
           salaryMin: salary.salaryMin,
           salaryMax: salary.salaryMax,

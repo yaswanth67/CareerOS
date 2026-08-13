@@ -44,7 +44,7 @@ export class ArbeitnowProvider extends BaseJobProvider {
           description,
           requirements: [],
           skills: await this.extractSkills(`${job.title} ${job.tags?.join(' ') || ''} ${description}`),
-          experienceLevel: job.job_types?.join(' ') || '',
+          experienceLevel: '', // job_types are full_time/contract, not seniorities
           roleType: '',
           applyUrl: job.url || '',
           postedAt: job.created_at ? new Date(job.created_at) : new Date(),

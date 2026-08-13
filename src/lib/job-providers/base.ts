@@ -139,11 +139,13 @@ export class BaseJobProvider implements JobProviderAdapter {
       description: raw.description || raw.content || '',
       requirements: raw.requirements || [],
       skills: raw.skills || raw.tags || [],
-      // Fall back to the title, exactly as roleType does on the next line —
-      // otherwise a board that sends no seniority field makes every posting MID.
-      experienceLevel: this.parseExperienceLevel(
-        raw.experienceLevel || raw.seniority || raw.title || raw.name
-      ),
+      // Seniority: trust an explicit provider field only when it actually
+      // carries a signal. Several boards put an *employment* type there
+      // ("FullTime", "full_time"), which classifies to MID and used to shadow
+      // the title — silently flattening every posting to mid-level. So classify
+      // the explicit field first, and fall back to the title when it says
+      // nothing. roleType does the same on the next line.
+      experienceLevel: this.pickExperienceLevel(raw),
       roleType: this.parseRoleType(raw.roleType || raw.category || raw.title),
       salaryMin: raw.salaryMin || raw.minSalary,
       salaryMax: raw.salaryMax || raw.maxSalary,
@@ -163,6 +165,13 @@ export class BaseJobProvider implements JobProviderAdapter {
    * backfill script can reuse it without importing a provider class — see
    * src/lib/job-providers/experience-level.ts for the rules.
    */
+  /** Explicit seniority when the provider supplies a real one, else the title. */
+  protected pickExperienceLevel(raw: RawProviderJob): ExperienceLevel {
+    const explicit = this.parseExperienceLevel(raw.experienceLevel || raw.seniority)
+    if (explicit !== 'MID') return explicit
+    return this.parseExperienceLevel(raw.title || raw.name)
+  }
+
   protected parseExperienceLevel(level: string | undefined): ExperienceLevel {
     return classifyExperienceLevel(level)
   }
