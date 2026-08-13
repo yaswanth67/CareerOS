@@ -72,6 +72,52 @@
     scroll-behavior: smooth;
   }
 
+  /* Scrollbars, themed off `--primary` so one rule covers both modes: burgundy
+     on light, blush on dark. Kept low-alpha because a full-strength brand
+     scrollbar competes with the content on every scrollable panel — it firms up
+     on hover instead. `.scrollbar-hide` still wins where it's applied, being the
+     more specific selector. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--primary) / 0.35) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--primary) / 0.35);
+    border-radius: 999px;
+    /* Transparent border + background-clip keeps the thumb visually inset
+       rather than filling the full gutter edge to edge. */
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--primary) / 0.6);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Native widgets (scrollbars on unstyled surfaces, date pickers, selects)
+     follow the app theme rather than the OS. */
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;

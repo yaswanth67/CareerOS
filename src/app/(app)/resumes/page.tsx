@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { EditResumeModal, type EditableResume } from '@/components/resumes/EditResumeModal'
+import { ViewResumeModal } from '@/components/resumes/ViewResumeModal'
 import { formatDate } from '@/lib/utils'
 import { ParsedResume, RoleType } from '@/types'
 import { useToast } from '@/components/ui/Toast'
@@ -46,6 +47,87 @@ const roleLabels: Record<RoleType, string> = {
   OTHER: 'Other',
 }
 
+const SECTION_HEADERS = ['PROFILE', 'PROFESSIONAL SUMMARY', 'SUMMARY', 'WORK EXPERIENCE', 'EXPERIENCE', 'EDUCATION', 'SKILLS', 'PROJECTS', 'PUBLICATIONS', 'CERTIFICATIONS', 'AWARDS']
+
+function getResumeSection(text: string, names: string[]) {
+  const header = names.join('|')
+  const allHeaders = SECTION_HEADERS.join('|')
+  const match = text.match(new RegExp(`(?:^|\\n)\\s*(?:${header})\\s*(?:\\n|$)([\\s\\S]*?)(?=(?:^|\\n)\\s*(?:${allHeaders})\\s*(?:\\n|$)|$)`, 'im'))
+  if (match?.[1].trim()) return match[1].trim()
+
+  // PDF text extraction often removes every line break. Fall back to finding
+  // all-caps section labels within the text so those resumes stay readable too.
+  const start = new RegExp(`\\b(?:${header})\\b`).exec(text)
+  if (!start) return ''
+  const contentStart = (start.index ?? 0) + start[0].length
+  const remainder = text.slice(contentStart)
+  const next = new RegExp(`\\b(?:${allHeaders})\\b`).exec(remainder)
+  return remainder.slice(0, next?.index ?? remainder.length).trim()
+}
+
+function normalizeExtractedText(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    // Some PDFs extract acronyms one character per line (e.g. "L L M" / "P C O S").
+    .replace(/(?:\b[A-Z]\s+){2,}[A-Z](?=(?:\s|[-&])|$)/g, acronym => acronym.replace(/\s/g, ''))
+    .replace(/\b([A-Z])\s*&\s*([A-Z])\b/g, '$1&$2')
+    .replace(/([A-Za-z])-\s+(?=[A-Z])/g, '$1-')
+    .replace(/([a-z])(?=(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/g, '$1 ')
+    .trim()
+}
+
+function readableParagraphs(text: string) {
+  const normalized = normalizeExtractedText(text)
+  return normalized.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(Boolean)
+}
+
+function splitPortfolioEntries(text: string, type: 'projects' | 'publications') {
+  const normalized = normalizeExtractedText(text)
+  // Entry headings must begin at the section start or after the previous
+  // entry's final sentence. This avoids treating every capitalized word before
+  // a technology pipe (e.g. LLM-Powered Document Q&A Assistant) as an entry.
+  const entryPattern = type === 'projects'
+    ? /(?:^|(?<=\.\s))([A-Z][^|]{3,120}\|(?=[\s\S]{0,200}?\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\b))/g
+    : /(?:^|(?<=\.\s))([A-Z][\s\S]{3,160}?\s+(?:Springer|IEEE|ACM|Scopus))/g
+  const starts = Array.from(normalized.matchAll(entryPattern)).map(match => {
+    const heading = match[1] || ''
+    return (match.index ?? 0) + match[0].length - heading.length
+  })
+
+  if (!starts.length) return normalized ? [normalized] : []
+  return starts.map((start, index) => normalized.slice(start, starts[index + 1]).trim()).filter(Boolean)
+}
+
+function splitExperienceEntries(text: string) {
+  const normalized = readableParagraphs(text).join(' ')
+  const dateRange = String.raw`(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\s*[-–]\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|Present|Current)`
+  // A position begins with its title, but it becomes a real experience entry
+  // only when its start/end (or current) date is found after the employer.
+  const positionStart = new RegExp(
+    String.raw`\b(?:[A-Z][A-Za-z&.-]*\s+){0,4}(?:Engineer|Developer|Assistant|Intern|Scientist|Analyst|Architect|Manager|Consultant|Designer|Researcher)\b(?=[\s\S]{0,160}?\b${dateRange}\b)`,
+    'g'
+  )
+  const starts = Array.from(normalized.matchAll(positionStart)).map(match => match.index ?? 0)
+
+  if (!starts.length) return normalized ? [normalized] : []
+  return starts.map((start, index) => normalized.slice(start, starts[index + 1]).trim()).filter(Boolean)
+}
+
+function splitEntryHeading(entry: string) {
+  const date = /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}\s*[-–]\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|Present|Current)\b/i.exec(entry)
+  if (!date || date.index == null) return { heading: '', details: entry }
+  const end = date.index + date[0].length
+  return { heading: entry.slice(0, end), details: entry.slice(end).trim() }
+}
+
+function splitEducationEntries(text: string) {
+  const education = normalizeExtractedText(getResumeSection(text, ['EDUCATION']))
+  return education
+    .split(/(?=\b(?:Master(?:'s)?|Bachelor(?:'s)?|B\.?Tech|M\.?Tech|B\.?S\.?|M\.?S\.?|Ph\.?D\.?|MBA)\b)/i)
+    .map(entry => entry.trim())
+    .filter(Boolean)
+}
+
 export default function ResumesPage() {
   const { data: session } = useSession()
   const { toast } = useToast()
@@ -54,6 +136,10 @@ export default function ResumesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingResume, setEditingResume] = useState<Resume | null>(null)
+
+  // The dialog renders at page root, so it looks the open resume up by id
+  // rather than being nested in that resume's card.
+  const viewingResume = resumes.find(r => r.id === expandedId) ?? null
 
   useEffect(() => {
     if (!session) return
@@ -162,7 +248,7 @@ export default function ResumesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setExpandedId(expandedId === resume.id ? null : resume.id)}
-                      title={expandedId === resume.id ? 'Hide parsed details' : 'Show parsed details'}
+                      title={expandedId === resume.id ? 'Hide resume' : 'View resume'}
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
@@ -207,53 +293,6 @@ export default function ResumesPage() {
                   )}
                 </div>
 
-                {expandedId === resume.id && (
-                  <div className="mb-4 space-y-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 p-4 animate-in">
-                    {resume.skills.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                          All Skills
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {resume.skills.map((skill, i) => (
-                            <Badge key={i} variant="gray" className="text-xs">
-                              {skill}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {resume.experience.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                          Experience
-                        </p>
-                        <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                          {resume.experience.slice(0, 5).map((exp, i) => (
-                            <li key={i}>
-                              • {exp.role} @ {exp.company} ({exp.duration})
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {resume.education.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                          Education
-                        </p>
-                        <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                          {resume.education.slice(0, 5).map((edu, i) => (
-                            <li key={i}>
-                              • {edu.degree}, {edu.school} ({edu.year})
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <span>Created {formatDate(resume.createdAt)}</span>
                   <span className="flex items-center gap-1.5">
@@ -275,6 +314,26 @@ export default function ResumesPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {viewingResume && (
+        <ViewResumeModal
+          resume={viewingResume}
+          roleLabel={roleLabels[viewingResume.roleType] || viewingResume.roleType}
+          onClose={() => setExpandedId(null)}
+          onEdit={() => {
+            setEditingResume(viewingResume)
+            setExpandedId(null)
+          }}
+          sections={{
+            getResumeSection,
+            splitExperienceEntries,
+            splitEntryHeading,
+            splitEducationEntries,
+            splitPortfolioEntries,
+            readableParagraphs,
+          }}
+        />
       )}
 
       {editingResume && (

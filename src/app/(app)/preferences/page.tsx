@@ -296,7 +296,7 @@ export default function PreferencesPage() {
               work preferences. Pick one from Advanced Filters on the dashboard.
             </p>
           </div>
-          {!editorOpen && (
+          {(
             <Button
               type="button"
               onClick={startCreate}
@@ -309,26 +309,42 @@ export default function PreferencesPage() {
         </div>
       </div>
 
-      {/* Editor */}
+      {/* Editor. A dialog rather than a panel above the list: inline, the card
+          being edited stayed visible and unchanged below the form, so there was
+          nothing tying the two together — you couldn't tell whether you were
+          editing that filter or making another one. Same shell as the resume
+          dialogs. */}
           {editorOpen && (
-            <Card hover={false} className="p-4 sm:p-5 space-y-5 border-primary-200 dark:border-primary-900/60">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-5 h-5 text-primary-600" />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {editingId === '' ? 'New target filter' : 'Edit target filter'}
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+              onClick={closeEditor}
+              role="dialog"
+              aria-modal="true"
+            >
+            <div
+              className="w-full max-w-3xl card shadow-2xl animate-in flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3 p-5 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Filter className="w-5 h-5 text-primary-600 dark:text-primary-300 shrink-0" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    {editingId === ''
+                      ? 'New target filter'
+                      : `Editing "${filters.find(f => f.id === editingId)?.name ?? draft.name}"`}
                   </h2>
                 </div>
                 <button
                   type="button"
                   onClick={closeEditor}
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
                   aria-label="Close editor"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
+              <div className="overflow-y-auto p-5 space-y-5">
               {error && (
                 <div className="flex items-start gap-2 rounded-lg bg-danger-50 dark:bg-danger-500/10 p-3 text-sm text-danger-600 dark:text-danger-400">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -475,11 +491,13 @@ export default function PreferencesPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-1 border-t border-gray-200 dark:border-gray-700">
-                <Button type="button" variant="secondary" onClick={closeEditor} className="mt-4">
+              </div>
+
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+                <Button type="button" variant="secondary" onClick={closeEditor}>
                   Cancel
                 </Button>
-                <Button type="button" onClick={handleSave} disabled={saving} className="mt-4">
+                <Button type="button" onClick={handleSave} disabled={saving}>
                   {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -493,11 +511,12 @@ export default function PreferencesPage() {
                   )}
                 </Button>
               </div>
-            </Card>
+            </div>
+            </div>
           )}
 
           {/* Saved filters */}
-          {filters.length === 0 && !editorOpen ? (
+          {filters.length === 0 ? (
             <Card className="text-center py-12">
               <Filter className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">No target filters yet</h3>

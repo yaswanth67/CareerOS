@@ -138,7 +138,7 @@ function GoalCard({
         <span
           className={cn(
             'text-xl font-bold leading-none tabular-nums shrink-0',
-            isComplete ? 'text-green-600 dark:text-green-400' : colors.text
+            colors.text
           )}
         >
           {hasTarget ? `${progress}%` : `${completed}`}
@@ -152,7 +152,7 @@ function GoalCard({
           <div
             className={cn(
               'h-full rounded-full transition-all duration-500',
-              isComplete ? 'bg-green-500' : colors.fill
+              colors.fill
             )}
             style={{ width: `${progress}%` }}
           />
@@ -193,7 +193,7 @@ function GoalCard({
 
         <div className="flex items-center gap-2">
           {isComplete && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+            <span className={cn('hidden sm:inline-flex items-center gap-1 text-xs font-medium', colors.text)}>
               <CheckCircle className="w-3.5 h-3.5" />
               Done
             </span>
@@ -350,14 +350,19 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
     )
   }
 
-  const totalTarget = dailyGoal.applicationsTarget + dailyGoal.networkingTarget + dailyGoal.skillLearningTarget
-  const totalCompleted = dailyGoal.applicationsCompleted + dailyGoal.networkingCompleted + dailyGoal.skillLearningCompleted
-  // Capped at 100: overshooting one goal (3 applies against a target of 1) used
-  // to render "129%" and a bar that ran past its track.
-  const overallProgress = totalTarget > 0 ? Math.min(100, Math.round((totalCompleted / totalTarget) * 100)) : 0
-  const allComplete = dailyGoal.applicationsCompleted >= dailyGoal.applicationsTarget &&
-    dailyGoal.networkingCompleted >= dailyGoal.networkingTarget &&
-    dailyGoal.skillLearningCompleted >= dailyGoal.skillLearningTarget
+  // Each goal contributes at most its own target. Summing raw counts let one
+  // overshooting goal pay for another's shortfall — 2/1 + 2/2 + 3/5 read as
+  // "88%, 7 of 8" while a card below it plainly said 60%. Capping per goal keeps
+  // the headline honest: the same day is 6 of 8.
+  const goalPairs: [number, number][] = [
+    [dailyGoal.applicationsCompleted, dailyGoal.applicationsTarget],
+    [dailyGoal.networkingCompleted, dailyGoal.networkingTarget],
+    [dailyGoal.skillLearningCompleted, dailyGoal.skillLearningTarget],
+  ]
+  const totalTarget = goalPairs.reduce((sum, [, target]) => sum + target, 0)
+  const totalCompleted = goalPairs.reduce((sum, [done, target]) => sum + Math.min(done, target), 0)
+  const overallProgress = totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0
+  const allComplete = totalTarget > 0 && totalCompleted === totalTarget
 
   return (
     <div className="card">
@@ -372,11 +377,15 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <div className="text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isToday ? 'Today' : format(currentDate, 'EEEE, MMMM d, yyyy')}
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                {format(currentDate, 'EEE, MMM d')}
               </p>
-              {isToday && <span className="badge bg-primary-100 text-primary-600 dark:bg-primary-200/30 dark:text-primary-200 text-xs">Today</span>}
+              {isToday && (
+                <span className="badge bg-primary-100 text-primary-600 dark:bg-primary-200/20 dark:text-primary-200 text-xs">
+                  Today
+                </span>
+              )}
             </div>
             <button
               onClick={goToNextDay}
@@ -389,10 +398,10 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
 
           <div className="flex items-center gap-2">
             {streak > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full">
-                <span className="text-lg">🔥</span>
-                <span className="font-bold text-sm">{streak}</span>
-                <span className="text-xs">day streak</span>
+              <div className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                <span className="text-sm leading-none">🔥</span>
+                <span className="text-sm font-bold leading-none">{streak}</span>
+                <span className="text-xs leading-none">day{streak === 1 ? '' : 's'}</span>
               </div>
             )}
             <Button
@@ -409,7 +418,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <span className="font-medium text-gray-900 dark:text-white">Overall Progress</span>
-            <span className={cn('font-bold', allComplete ? 'text-green-600 dark:text-green-400' : 'text-primary-600 dark:text-primary-300')}>
+            <span className="font-bold text-primary-600 dark:text-primary-300">
               {overallProgress}%
             </span>
           </div>
@@ -417,7 +426,7 @@ export function DailyGoalTracker({ initialDate }: DailyGoalTrackerProps) {
             <div
               className={cn(
                 'h-full rounded-full transition-all duration-500',
-                allComplete ? 'bg-green-500' : 'bg-primary-500 dark:bg-primary-200'
+                'bg-primary-500 dark:bg-primary-200'
               )}
               style={{ width: `${overallProgress}%` }}
             />

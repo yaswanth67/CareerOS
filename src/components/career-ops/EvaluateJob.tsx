@@ -358,7 +358,7 @@ export default function EvaluateJob() {
           <div className="text-sm text-gray-600 dark:text-gray-300">
             <p className="font-medium text-gray-900 dark:text-white">Reading the posting and scoring it…</p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              This runs the full career-ops A–G evaluation, so it takes about 30 seconds.
+              This runs the full career-ops A–G evaluation, so it takes about a minute or two.
             </p>
           </div>
         </div>
