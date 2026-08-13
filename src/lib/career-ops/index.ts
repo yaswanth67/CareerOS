@@ -1337,8 +1337,6 @@ export async function runEvaluation(args: {
 export interface RoleSuggestion {
   /** The market job title as actually posted, not an invented hybrid. */
   title: string
-  /** Lateral = same work, new label · Stretch = one level up · Pivot = adjacent function. */
-  axis: 'Lateral' | 'Stretch' | 'Pivot'
   /** 1–2 lines from cv.md quoted verbatim that back the suggestion. */
   cvEvidence: string
   /** What a hiring manager would question at the candidate's level; "none" for Lateral. */
@@ -1414,12 +1412,12 @@ IMPORTANT OPERATING RULES FOR THIS SESSION
 1. You do NOT have access to WebSearch, Playwright, or file writing tools. Base everything on the CV and profile provided.
 2. Write all human-facing output in English.
 3. LEVEL BINDING (HARD RULE): The candidate's recorded level is in "Profile config" (target_roles.archetypes[].level) and their experience in the CV. Suggest ONLY roles credible at that level. HARD EXCLUDE any title implying seniority — senior, lead, principal, staff, architect, director, head, manager — and any role whose market standard requires 5+ years of experience. If the natural title for a skill is senior-only, do NOT suggest it; use the junior/mid equivalent or skip it. A suggestion that reads as "5+ years" is a failure.
-4. Follow the titles.md output contract exactly: 5-10 suggestions, Lateral first, each with Title, Axis, CV evidence quoted VERBATIM, honest gap note, and market-reality note. Never invent evidence — every suggestion must be traceable to a quoted cv.md line.
+4. Follow the titles.md output contract exactly: 5-10 suggestions, each with Title, CV evidence quoted VERBATIM, honest gap note, and market-reality note. Never invent evidence — every suggestion must be traceable to a quoted cv.md line.
 5. Dedup against the current scan filter: skip any candidate title an existing positive keyword already substring-matches, and never suggest anything the negative keywords exclude (deal-breakers).
 6. At the very end, output a machine-readable JSON block in this exact format (one object per suggestion, same order as the markdown). Emit it as plain text — do NOT wrap it in a markdown code fence:
 
 ---SUGGESTIONS_JSON---
-[{"title":"<title>","axis":"Lateral","cvEvidence":"<verbatim quote>","gapNote":"<note>","marketNote":"<note>","keyword":"<shortest search phrase>"}]
+[{"title":"<title>","cvEvidence":"<verbatim quote>","gapNote":"<note>","marketNote":"<note>","keyword":"<shortest search phrase>"}]
 ---END_SUGGESTIONS_JSON---`
 
   let raw: string
@@ -1517,7 +1515,6 @@ function parseSuggestionsJson(raw: string): RoleSuggestion[] {
           .filter((s) => s && typeof s.title === 'string' && s.title.trim())
           .map((s) => ({
             title: s.title.trim(),
-            axis: ['Lateral', 'Stretch', 'Pivot'].includes(s.axis) ? s.axis : 'Lateral',
             cvEvidence: typeof s.cvEvidence === 'string' ? s.cvEvidence : '',
             gapNote: typeof s.gapNote === 'string' ? s.gapNote : '',
             marketNote: typeof s.marketNote === 'string' ? s.marketNote : '',
@@ -1547,8 +1544,6 @@ function parseSuggestionsFromMarkdown(markdown: string): RoleSuggestion[] {
     const title = heading.replace(/^\d+\.\s*/, '').trim()
     if (!title) continue
 
-    const axisMatch = block.match(/-\s*\*\*Axis:\*\*\s*([A-Za-z]+)/i)
-    const axisRaw = axisMatch?.[1] ?? 'Lateral'
     const cvEvidence = (block.match(/-\s*\*\*CV evidence:\*\*\s*(.+)/i)?.[1] ?? '')
       .trim()
       .replace(/^["']|["']$/g, '')
@@ -1559,9 +1554,6 @@ function parseSuggestionsFromMarkdown(markdown: string): RoleSuggestion[] {
 
     suggestions.push({
       title,
-      axis: ['Lateral', 'Stretch', 'Pivot'].includes(axisRaw)
-        ? (axisRaw as RoleSuggestion['axis'])
-        : 'Lateral',
       cvEvidence,
       gapNote,
       marketNote,
