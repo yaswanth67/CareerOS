@@ -5,118 +5,106 @@
 @layer base {
   :root {
     --font-inter: 'Inter', system-ui, sans-serif;
-    /* Warm neutrals matching the `gray` scale in tailwind.config.ts. These were
-       slate values (blue-tinted) — the second source, alongside Tailwind's cool
-       default gray, of the blue cast under the burgundy brand. */
-    --background: 250 248 249;
-    --foreground: 22 15 18;
-    --card: 255 255 255;
-    --card-foreground: 22 15 18;
-    --popover: 255 255 255;
-    --popover-foreground: 22 15 18;
-    --primary: 160 38 81;
-    --primary-foreground: 255 255 255;
-    --secondary: 244 240 241;
-    --secondary-foreground: 22 15 18;
-    --muted: 244 240 241;
-    --muted-foreground: 120 106 113;
-    --accent: 244 240 241;
-    --accent-foreground: 22 15 18;
+    --font-display: 'Playfair Display', Georgia, serif;
+
+    /* Warm Off-White (Belgium Cream) Background */
+    --background: 252 249 242;   /* warm off-white #fcf9f2 */
+    --foreground: 45 40 35;      /* dark khaki #2d2823 */
+
+    --card: 250 248 242;         /* lighter cream/off-white #faf8f2 */
+    --card-foreground: 45 40 35;
+
+    --popover: 250 248 242;      /* lighter cream/off-white */
+    --popover-foreground: 45 40 35;
+
+    /* Primary = Khaki Green */
+    --primary: 107 115 85;       /* khaki-600 #6b7355 */
+    --primary-foreground: 252 249 242;
+
+    /* Khaki secondary tones */
+    --secondary: 210 200 175;    /* khaki-200 #d2c8af */
+    --secondary-foreground: 45 40 35;
+
+    --muted: 220 210 190;        /* khaki-100 #dcd2be */
+    --muted-foreground: 90 85 75;  /* khaki-500 */
+
+    --accent: 212 168 67;        /* gold-500 #c49638 */
+    --accent-foreground: 45 40 35;
+
     --destructive: 239 68 68;
     --destructive-foreground: 255 255 255;
-    --border: 232 224 227;
-    --input: 232 224 227;
-    --ring: 160 38 81;
+
+    --border: 195 185 160;       /* khaki-300 #c3b9a0 */
+    --input: 195 185 160;
+    --ring: 107 115 85;
+
     --radius: 0.75rem;
+    /* Mark-specific color vars: used by inline SVG mark to adapt to theme */
+    --mark-bg: 107 115 85; /* default: primary */
+    --mark-foreground: 252 249 242; /* default: primary-foreground */
+    --mark-accent: 212 168 67; /* accent/gold */
+    --mark-stroke: 45 40 35; /* dark stroke */
   }
 
-  .dark {
-    /* Warm near-black. Page #160f12, cards #241a1e, borders #3a2f35 — the same
-       values as gray-900/800/700 so CSS-variable surfaces and `dark:bg-gray-*`
-       utilities land on identical colours. */
-    --background: 22 15 18;
-    --foreground: 244 240 241;
-    --card: 36 26 30;
-    --card-foreground: 244 240 241;
-    --popover: 36 26 30;
-    --popover-foreground: 244 240 241;
-    --primary: 242 205 211;
-    --primary-foreground: 74 16 36;
-    --secondary: 58 47 53;
-    --secondary-foreground: 244 240 241;
-    --muted: 58 47 53;
-    --muted-foreground: 162 147 154;
-    --accent: 58 47 53;
-    --accent-foreground: 244 240 241;
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
-    --border: 58 47 53;
-    --input: 58 47 53;
-    --ring: 242 205 211;
-  }
+/* Dark mode overrides for the mark: invert tile so it stands out on dark pages */
+.dark {
+  --mark-bg: 252 249 242; /* cream tile on dark backgrounds */
+  --mark-foreground: 45 40 35; /* dark briefcase on cream tile */
+  --mark-accent: 212 168 67;
+  --mark-stroke: 252 249 242;
+}
 }
 
-  * {
-    @apply border-gray-200 dark:border-gray-700;
-    border-color: rgb(var(--border));
-  }
+* {
+  @apply border-belgium-300;
+  border-color: rgb(var(--border));
+}
 
-  body {
-    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
-    background-color: rgb(var(--background));
-    color: rgb(var(--foreground));
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  }
+body {
+  @apply bg-belgium-50 text-khaki-900;
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
 
-  html {
-    scroll-behavior: smooth;
-  }
+html {
+  scroll-behavior: smooth;
+}
 
-  /* Scrollbars, themed off `--primary` so one rule covers both modes: burgundy
-     on light, blush on dark. Kept low-alpha because a full-strength brand
-     scrollbar competes with the content on every scrollable panel — it firms up
-     on hover instead. `.scrollbar-hide` still wins where it's applied, being the
-     more specific selector. */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(var(--primary) / 0.35) transparent;
-  }
+/* Scrollbars themed off --primary (forest) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--primary) / 0.35) transparent;
+}
 
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
 
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-  ::-webkit-scrollbar-thumb {
-    background-color: rgb(var(--primary) / 0.35);
-    border-radius: 999px;
-    /* Transparent border + background-clip keeps the thumb visually inset
-       rather than filling the full gutter edge to edge. */
-    border: 2px solid transparent;
-    background-clip: content-box;
-  }
+::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--primary) / 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(var(--primary) / 0.6);
-  }
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--primary) / 0.6);
+}
 
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
-  /* Native widgets (scrollbars on unstyled surfaces, date pickers, selects)
-     follow the app theme rather than the OS. */
-  :root {
-    color-scheme: light;
-  }
-
-  .dark {
-    color-scheme: dark;
-  }
+/* Native widgets follow app theme */
+:root {
+  color-scheme: light;
+}
 
 @layer components {
   .btn {
@@ -124,42 +112,46 @@
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 dark:bg-primary-200 dark:text-primary-800 dark:hover:bg-primary-300 dark:focus:ring-primary-400;
+    @apply btn bg-primary-600 text-belgium-50 hover:bg-primary-700 focus:ring-primary-500;
   }
 
   .btn-secondary {
-    @apply btn bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700;
+    @apply btn bg-belgium-200 text-khaki-900 hover:bg-belgium-300 focus:ring-khaki-500;
   }
 
   .btn-outline {
-    @apply btn border border-gray-300 bg-transparent hover:bg-gray-50 focus:ring-gray-500 dark:border-gray-600 dark:hover:bg-gray-800;
+    @apply btn border border-belgium-300 bg-transparent hover:bg-belgium-100 focus:ring-khaki-500;
   }
 
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-gray-100 focus:ring-gray-500 dark:hover:bg-gray-800;
+    @apply btn bg-transparent hover:bg-belgium-100 focus:ring-khaki-500;
   }
 
   .btn-danger {
     @apply btn bg-danger-500 text-white hover:bg-danger-600 focus:ring-danger-500;
   }
 
+  .btn-gold {
+    @apply btn bg-gold-500 text-khaki-900 hover:bg-gold-600 focus:ring-gold-400;
+  }
+
   .input {
-    @apply w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500;
+    @apply w-full rounded-lg border border-belgium-300 bg-belgium-50 px-4 py-2.5 text-sm placeholder:text-khaki-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20;
   }
 
   .label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5;
+    @apply block text-sm font-medium text-khaki-700 mb-1.5;
   }
 
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm;
+    @apply bg-white rounded-xl border border-belgium-200 shadow-sm;
     background-color: rgb(var(--card));
     color: rgb(var(--card-foreground));
     border-color: rgb(var(--border));
   }
 
   .card-hover {
-    @apply card transition-all duration-200 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600;
+    @apply card transition-all duration-200 hover:shadow-md hover:border-belgium-300;
   }
 
   .badge {
@@ -167,23 +159,27 @@
   }
 
   .badge-success {
-    @apply badge bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400;
+    @apply badge bg-success-100 text-success-600;
   }
 
   .badge-warning {
-    @apply badge bg-warning-100 text-warning-600 dark:bg-warning-500/20 dark:text-warning-400;
+    @apply badge bg-warning-100 text-warning-600;
   }
 
   .badge-danger {
-    @apply badge bg-danger-100 text-danger-600 dark:bg-danger-500/20 dark:text-danger-400;
+    @apply badge bg-danger-100 text-danger-600;
   }
 
   .badge-info {
-    @apply badge bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400;
+    @apply badge bg-primary-100 text-primary-600;
+  }
+
+  .badge-gold {
+    @apply badge bg-gold-100 text-gold-700;
   }
 
   .badge-gray {
-    @apply badge bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300;
+    @apply badge bg-belgium-200 text-khaki-600;
   }
 }
 
@@ -204,11 +200,6 @@
      ENTRANCE ANIMATIONS
      ============================================ */
 
-  /* `both`, not `forwards`: with a stagger delay the element must hold the
-     0% (hidden) state *during* the delay, otherwise it flashes at full opacity
-     before animating. Doing it here rather than with an inline `opacity: 0`
-     matters — an inline style outranks the reduced-motion rule below, so a
-     staggered card would stay invisible forever for those users. */
   .animate-in {
     animation: animateIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
@@ -224,8 +215,6 @@
     }
   }
 
-  /* Exit counterpart to .animate-in — used by Toast when a toast dismisses.
-     Without it the exit state rendered instantly with no transition. */
   .animate-out {
     animation: animateOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
   }
@@ -314,6 +303,19 @@
     animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
+  /* Prevent invisible white text on light backgrounds
+     When an element uses `text-white` but sits on a light background
+     (card / bg-white / belgium off-white), force it to the khaki-700
+     brand color so text remains legible. This targets only white text
+     that would otherwise disappear on light surfaces. */
+  .bg-white .text-white,
+  .card .text-white,
+  .bg-belgium-50 .text-white,
+  .bg-belgium-100 .text-white,
+  .bg-belgium-200 .text-white {
+    color: rgb(85 91 67) !important; /* text-khaki-700 */
+  }
+
   @keyframes slideDown {
     from {
       opacity: 0;
@@ -379,7 +381,6 @@
      INTERACTION ANIMATIONS
      ============================================ */
 
-  /* Shake for validation errors */
   .animate-shake {
     animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
   }
@@ -390,7 +391,6 @@
     20%, 40%, 60%, 80% { transform: translateX(4px); }
   }
 
-  /* Pulse ring for loading states */
   .animate-pulse-ring {
     animation: pulse-ring 1.5s ease-out infinite;
   }
@@ -400,7 +400,6 @@
     100% { transform: scale(1.5); opacity: 0; }
   }
 
-  /* Morphing blob for loading */
   .animate-blob {
     animation: blob 8s ease-in-out infinite;
   }
@@ -412,7 +411,6 @@
     75% { border-radius: 60% 40% 60% 40% / 40% 60% 60% 40%; }
   }
 
-  /* Spin with easing */
   .animate-spin-smooth {
     animation: spin-smooth 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
@@ -422,7 +420,6 @@
     to { transform: rotate(360deg); }
   }
 
-  /* Bounce in for success states */
   .animate-bounce-in {
     animation: bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
   }

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <!-- Rounded tile background (dark khaki) -->
+  <rect x="32" y="32" width="960" height="960" rx="160" ry="160" fill="#3b4236" />
+
+  <!-- Motion streaks (gold) -->
+  <g fill="#c49638">
+    <rect x="160" y="380" width="120" height="24" rx="12" transform="skewX(-8)" opacity="0.95" />
+    <rect x="160" y="426" width="88" height="18" rx="9" transform="skewX(-8)" opacity="0.95" />
+    <rect x="160" y="470" width="56" height="14" rx="7" transform="skewX(-8)" opacity="0.95" />
+  </g>
+
+  <!-- Briefcase body (cream) -->
+  <g fill="#fcf9f2">
+    <!-- main body -->
+    <rect x="240" y="320" width="544" height="336" rx="40" />
+    <!-- flap (slightly inset to create shape) -->
+    <path d="M240 416 L784 416 L704 560 L320 560 Z" opacity="0.95" />
+    <!-- handle cutout -->
+    <rect x="396" y="248" width="232" height="80" rx="20" fill="#fcf9f2" />
+  </g>
+
+  <!-- Briefcase details: strap and buckle -->
+  <g>
+    <!-- strap lines (dark khaki) -->
+    <path d="M320 520 L704 520" stroke="#2d3029" stroke-width="20" stroke-linecap="round" fill="none" />
+    <!-- buckle (gold outline with cream center) -->
+    <rect x="476" y="472" width="72" height="72" rx="12" fill="#fcf9f2" stroke="#c49638" stroke-width="12" />
+    <!-- handle inner (dark) -->
+    <rect x="420" y="264" width="184" height="48" rx="12" fill="#2d3029" />
+  </g>
+
+</svg>

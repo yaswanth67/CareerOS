@@ -48,28 +48,28 @@ export function StatsCards({ stats }: { stats: Stats }) {
       value: stats.totalJobs.toLocaleString(),
       icon: <Briefcase className="w-6 h-6" />,
       sub: `${stats.jobsToday} fetched today`,
-      color: 'bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400',
+      color: 'bg-belgium-200 text-khaki-700 dark:bg-khaki-800 dark:text-belgium-300',
     },
     {
       title: 'Strong Matches',
       value: stats.strongMatches.toLocaleString(),
       icon: <Target className="w-6 h-6" />,
       sub: `${stats.matches} total matches`,
-      color: 'bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400',
+      color: 'bg-belgium-200 text-khaki-700 dark:bg-khaki-800 dark:text-belgium-300',
     },
     {
       title: 'Applications',
       value: stats.applications.toLocaleString(),
       icon: <FileText className="w-6 h-6" />,
       sub: 'saved & applied',
-      color: 'bg-warning-100 text-warning-600 dark:bg-warning-500/20 dark:text-warning-400',
+      color: 'bg-belgium-200 text-khaki-700 dark:bg-khaki-800 dark:text-belgium-300',
     },
     {
       title: 'Match Rate',
       value: `${stats.totalJobs > 0 ? Math.round((stats.strongMatches / Math.max(1, stats.totalJobs)) * 100) : 0}%`,
       icon: <CheckCircle2 className="w-6 h-6" />,
       sub: 'jobs scored 80+',
-      color: 'bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400',
+      color: 'bg-belgium-200 text-khaki-700 dark:bg-khaki-800 dark:text-belgium-300',
     },
   ]
 

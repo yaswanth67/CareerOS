@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-command first-run setup for Prose.
+ * One-command first-run setup for CareerOS.
  *
  * Installs everything — app dependencies, the SQLite database, and the
  * career-ops workspace — from a single command. Safe to re-run (idempotent):

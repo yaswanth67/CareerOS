@@ -1,4 +1,4 @@
-# Prose
+# CareerOS
 
 An AI-powered job matching app that pulls live **US** jobs from real job boards, parses your resume, and **scores how well you match each job** — with reasoning, matched skills, and missing skills. It also writes the application for you: tailored CV, cover letter, outreach emails, interview prep and follow-ups, per job.
 

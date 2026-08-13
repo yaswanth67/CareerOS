@@ -34,7 +34,7 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">2. Where Your Data Lives</h2>
             <p>
               Your account, resumes, preferences, and applications are stored in a local database on the machine
-              running Prose. We do not sell or share this data with any third party.
+              running CareerOS. We do not sell or share this data with any third party.
             </p>
           </section>
 
@@ -43,7 +43,7 @@ export default function PrivacyPage() {
             <p>
               To score jobs and parse resumes, selected text may be sent to the AI provider configured in
               <code className="mx-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-sm">.env</code>.
-              By default Prose points at your local Claude Code connection. If you configure a cloud AI API
+              By default CareerOS points at your local Claude Code connection. If you configure a cloud AI API
               key instead, resume text may be transmitted to that provider to generate scores and analysis.
             </p>
           </section>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">4. Sessions &amp; Cookies</h2>
             <p>
-              Prose uses a signed session token (NextAuth JWT) stored in your browser so you stay signed in.
+              CareerOS uses a signed session token (NextAuth JWT) stored in your browser so you stay signed in.
               No advertising or tracking cookies are used.
             </p>
           </section>
