@@ -68,3 +68,10 @@ ehthumbs.db
 Desktop.ini
 # session cookies (sensitive)
 cookies.txt
+
+# demo/record files
+record-demo.mjs
+record-demo-instant.mjs
+debug-signin.mjs
+generate-fixtures.mjs
+demo-videos/
