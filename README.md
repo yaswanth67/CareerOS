@@ -615,5 +615,3 @@ than left to look like coverage.
 - [ ] **Migrate SQLite → Postgres** when needed (Prisma makes this a config change + array handling)
 
 ---
-
-**Built with Next.js, Prisma, and the local Claude Code connection.**
