@@ -4,6 +4,14 @@ An AI-powered job matching app that pulls live **US** jobs from real job boards,
 
 Built with Next.js 16 (App Router), Prisma + SQLite, NextAuth, and the **Anthropic SDK pointed at your local Claude Code connection** (no cloud API key required).
 
+---
+
+## How it works (animated)
+
+![CareerOS pipeline](public/workflow-animation.mp4)
+
+*The pipeline: upload résumé → fetch live US jobs → auto-match scoring → Best Matches feed → AI Career toolkit*
+
 > **Scope: United States only.** Non-US postings are rejected at ingest and filtered out of every query — see [US-only](#us-only).
 
 ---
