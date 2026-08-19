@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bot, Loader2, MessagesSquare, Send, User, FileText, Download, RotateCcw, Sparkles, Award, Zap, FileOutput } from 'lucide-react'
+import { Bot, Loader2, MessagesSquare, Send, User, FileText, Download, RotateCcw, Sparkles, Award, Zap, FileOutput, FileType } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { useToast } from '@/components/ui/Toast'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
 import { jsPDF } from 'jspdf'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, PageOrientation, convertInchesToTwip, Footer, Header, PageNumber, TabStopType, TabStopPosition, LevelFormat, Numbering } from 'docx'
+import { saveAs } from 'file-saver'
 
 interface ResumeOption {
   id: string
@@ -454,6 +456,177 @@ export function ChatAssistant() {
     toast({ type: 'success', message: 'Fast resume downloaded as PDF' })
   }
 
+  const downloadFastResumeDOCX = () => {
+    if (!fastResume) return
+
+    const safeRole = jobRole.replace(/[^a-z0-9]/gi, '_')
+    const lines = fastResume.split('\n')
+    const children: Paragraph[] = []
+
+    let i = 0
+    while (i < lines.length) {
+      const rawLine = lines[i]
+      const line = rawLine.trimEnd()
+
+      if (!line) {
+        children.push(new Paragraph({ text: '', spacing: { after: 60 } }))
+        i++
+        continue
+      }
+
+      // Name header (# Name)
+      if (line.startsWith('# ')) {
+        const name = line.slice(2).trim()
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: name, bold: true, size: 32, font: 'Calibri', color: '1A1A1A' })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 40, before: 0 },
+          })
+        )
+        i++
+        continue
+      }
+
+      // Section headers (## SECTION)
+      if (line.startsWith('## ')) {
+        const sectionTitle = line.slice(3).trim().toUpperCase()
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: sectionTitle, bold: true, size: 22, font: 'Calibri', color: '1A1A1A', allCaps: true })],
+            spacing: { before: 200, after: 80 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '2D2D2D' } },
+          })
+        )
+        i++
+        continue
+      }
+
+      // Sub-section headers (### Role — Company | Dates)
+      if (line.startsWith('### ')) {
+        const subTitle = line.slice(4).trim()
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: subTitle, bold: true, size: 22, font: 'Calibri', color: '2D2D2D' })],
+            spacing: { before: 140, after: 60 },
+          })
+        )
+        i++
+        continue
+      }
+
+      // Bullet points (- or •)
+      if (line.startsWith('- ') || line.startsWith('• ')) {
+        const bulletText = line.slice(2).trim()
+        // Handle bold inline: **Text:** rest
+        const boldMatch = bulletText.match(/^\*\*(.+?)\*\*\s*(.*)$/)
+        if (boldMatch) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: '• ', size: 20, font: 'Calibri', color: '1A1A1A' }),
+                new TextRun({ text: boldMatch[1], bold: true, size: 20, font: 'Calibri', color: '1A1A1A' }),
+                new TextRun({ text: boldMatch[2], size: 20, font: 'Calibri', color: '1A1A1A' }),
+              ],
+              spacing: { after: 40, line: 276 },
+              indent: { left: convertInchesToTwip(0.25), hanging: convertInchesToTwip(0.25) },
+            })
+          )
+        } else {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: '• ', size: 20, font: 'Calibri', color: '1A1A1A' }),
+                new TextRun({ text: bulletText, size: 20, font: 'Calibri', color: '1A1A1A' }),
+              ],
+              spacing: { after: 40, line: 276 },
+              indent: { left: convertInchesToTwip(0.25), hanging: convertInchesToTwip(0.25) },
+            })
+          )
+        }
+        i++
+        continue
+      }
+
+      // Contact info line (Email | Phone | Location | LinkedIn | GitHub)
+      if (line.includes('|') && (line.includes('@') || line.includes('linkedin') || line.includes('github') || line.includes('.com'))) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: line, size: 20, font: 'Calibri', color: '4A4A4A' })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 120 },
+          })
+        )
+        i++
+        continue
+      }
+
+      // Bold inline handling for skill categories like **Languages:** [...]
+      if (line.includes('**') && line.includes(':')) {
+        const parts = line.split('**').filter(Boolean)
+        const runs: TextRun[] = []
+        for (let j = 0; j < parts.length; j++) {
+          const isBold = j % 2 === 0 && parts[j].endsWith(':')
+          if (isBold) {
+            runs.push(new TextRun({ text: parts[j], bold: true, size: 20, font: 'Calibri', color: '1A1A1A' }))
+          } else {
+            runs.push(new TextRun({ text: parts[j], size: 20, font: 'Calibri', color: '1A1A1A' }))
+          }
+        }
+        children.push(
+          new Paragraph({
+            children: runs,
+            spacing: { after: 60, line: 276 },
+          })
+        )
+        i++
+        continue
+      }
+
+      // Regular text
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: line, size: 20, font: 'Calibri', color: '1A1A1A' })],
+          spacing: { after: 60, line: 276 },
+        })
+      )
+      i++
+    }
+
+    // Create document with US Letter, 0.7" margins for one-page fit
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: convertInchesToTwip(0.6),
+              bottom: convertInchesToTwip(0.6),
+              left: convertInchesToTwip(0.7),
+              right: convertInchesToTwip(0.7),
+            },
+            size: { orientation: PageOrientation.PORTRAIT },
+          },
+        },
+        children,
+      }],
+      styles: {
+        default: {
+          document: {
+            run: { font: 'Calibri', size: 20, color: '1A1A1A' },
+            paragraph: { spacing: { line: 276 } },
+          },
+        },
+      },
+    })
+
+    Packer.toBlob(doc).then((blob) => {
+      saveAs(blob, `Fast_Resume_${safeRole}.docx`)
+      toast({ type: 'success', message: 'Fast resume downloaded as Word (.docx)' })
+    }).catch(() => {
+      toast({ type: 'error', message: 'Failed to generate Word document' })
+    })
+  }
+
   const hasConversation = messages.length > 0
 
   return (
@@ -713,10 +886,16 @@ export function ChatAssistant() {
                 <FileOutput className="w-4 h-4 text-purple-500" />
                 Fast Resume (ATS Optimized)
               </span>
-              <Button variant="ghost" size="sm" onClick={downloadFastResumePDF}>
-                <Download className="w-3.5 h-3.5 mr-1.5" />
-                Download PDF
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={downloadFastResumeDOCX}>
+                  <FileType className="w-3.5 h-3.5 mr-1.5" />
+                  Download Word
+                </Button>
+                <Button variant="ghost" size="sm" onClick={downloadFastResumePDF}>
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  Download PDF
+                </Button>
+              </div>
             </div>
             <div className="prose prose-sm dark:prose-invert max-w-none bg-white dark:bg-gray-900 rounded p-3 max-h-96 overflow-y-auto">
               <pre className="whitespace-pre-wrap leading-relaxed text-xs font-mono">{fastResume}</pre>
