@@ -233,15 +233,11 @@ export function ChatAssistant() {
     doc.text('Cover Letter', pageWidth / 2, y, { align: 'center' })
     y += 10
 
-    // Target role
+    // Date
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text(`Target Role: ${jobRole}`, margin, y)
-    y += 8
-
-    // Date
-    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     doc.text(`Date: ${today}`, margin, y)
     y += 12
 
