@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck, Ban, Settings } from 'lucide-react'
+import { X, Filter, MapPin, Briefcase, Globe, Clock, Target, Bookmark, Send, Loader2, ShieldCheck, Ban, Settings, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { RoleType, AppStatus } from '@/types'
+import { RoleType, AppStatus, ExperienceLevel } from '@/types'
 import { useToast } from '@/components/ui/Toast'
 import type { TargetFilter } from './useTargetFilters'
 
@@ -25,6 +25,14 @@ export const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'SECURITY', label: 'Security' },
   { value: 'QA', label: 'QA' },
   { value: 'OTHER', label: 'Other' },
+]
+
+export const experienceOptions: { value: ExperienceLevel; label: string }[] = [
+  { value: 'ENTRY', label: 'Entry' },
+  { value: 'MID', label: 'Mid' },
+  { value: 'SENIOR', label: 'Senior' },
+  { value: 'STAFF', label: 'Staff' },
+  { value: 'PRINCIPAL', label: 'Principal' },
 ]
 
 export const scoreOptions = [
@@ -67,6 +75,7 @@ interface Filters {
   posted: string
   status: AppStatus | ''
   sponsorship: boolean
+  experienceLevels: ExperienceLevel[]
 }
 
 interface FilterPanelProps {
@@ -91,6 +100,7 @@ function readParams(searchParams: URLSearchParams): Filters {
     posted: searchParams.get('posted') || '',
     status: (['SAVED', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'WITHDRAWN'].includes(status) ? status : '') as AppStatus | '',
     sponsorship: searchParams.get('sponsorship') === '1',
+    experienceLevels: (searchParams.get('experienceLevels')?.split(',').filter(Boolean) as ExperienceLevel[]) || [],
   }
 }
 
@@ -108,6 +118,7 @@ function toQuery(f: Filters): string {
   if (f.posted) params.set('posted', f.posted)
   if (f.status) params.set('status', f.status)
   if (f.sponsorship) params.set('sponsorship', '1')
+  if (f.experienceLevels.length) params.set('experienceLevels', f.experienceLevels.join(','))
   const s = params.toString()
   return s ? `?${s}` : ''
 }
@@ -133,7 +144,8 @@ export function FilterPanel({ isOpen, onClose, targetFilters }: FilterPanelProps
     (filters.posted ? 1 : 0) +
     (filters.status ? 1 : 0) +
     (filters.q ? 1 : 0) +
-    (filters.sponsorship ? 1 : 0)
+    (filters.sponsorship ? 1 : 0) +
+    filters.experienceLevels.length
 
   const commit = (next: Filters) => {
     setFilters(next)
@@ -183,6 +195,7 @@ export function FilterPanel({ isOpen, onClose, targetFilters }: FilterPanelProps
     const empty: Filters = {
       filter: '', q: '', roles: [], loc: '', locs: [], exclude: [], salary: '',
       remote: false, score: '0', posted: '', status: '', sponsorship: false,
+      experienceLevels: [],
     }
     commit(empty)
   }
@@ -395,6 +408,35 @@ export function FilterPanel({ isOpen, onClose, targetFilters }: FilterPanelProps
                   )}
                 >
                   {role.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Experience Level Filter */}
+          <div>
+            <label className="label flex items-center gap-1.5">
+              <GraduationCap className="w-4 h-4" />
+              Experience Level
+            </label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {experienceOptions.map((exp) => (
+                <button
+                  key={exp.value}
+                  onClick={() => {
+                    const levels = filters.experienceLevels.includes(exp.value)
+                      ? filters.experienceLevels.filter(l => l !== exp.value)
+                      : [...filters.experienceLevels, exp.value]
+                    commit({ ...filters, experienceLevels: levels })
+                  }}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+                    filters.experienceLevels.includes(exp.value)
+                      ? 'bg-primary-600 text-white dark:bg-primary-200 dark:text-primary-800'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  )}
+                >
+                  {exp.label}
                 </button>
               ))}
             </div>

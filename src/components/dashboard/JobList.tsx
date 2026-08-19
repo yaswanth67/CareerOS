@@ -7,7 +7,7 @@ import { prisma } from '@/lib/db'
 import { US_ONLY_WHERE } from '@/lib/geo/us-location'
 import { getCurrentUser } from '@/lib/auth'
 import { parseJsonArray } from '@/lib/utils'
-import { RoleType } from '@/types'
+import { RoleType, ExperienceLevel } from '@/types'
 
 interface JobListFilters {
   q?: string
@@ -25,6 +25,7 @@ interface JobListFilters {
   status?: string
   country?: string
   sponsorship?: string
+  experienceLevels?: string
   page?: number
 }
 
@@ -54,11 +55,13 @@ async function getJobs(filters: JobListFilters) {
   const where: Prisma.JobWhereInput = { isActive: true, ...US_ONLY_WHERE }
 
   const roles = filters.roles?.split(',').filter(Boolean) as RoleType[] | undefined
+  const experienceLevels = filters.experienceLevels?.split(',').filter(Boolean) as ExperienceLevel[] | undefined
 
   // Single country from the top-bar dropdown
   const singleCountry = filters.country
 
   if (roles?.length) where.roleType = { in: roles }
+  if (experienceLevels?.length) where.experienceLevel = { in: experienceLevels }
   if (filters.remote === '1') where.isRemote = true
 
   // Only jobs confirmed to offer visa sponsorship (AI/keyword detected)
@@ -296,6 +299,7 @@ export async function JobList({ searchParams }: { searchParams?: Record<string, 
     status: typeof searchParams?.status === 'string' ? searchParams.status : undefined,
     country: typeof searchParams?.country === 'string' ? searchParams.country : undefined,
     sponsorship: typeof searchParams?.sponsorship === 'string' ? searchParams.sponsorship : undefined,
+    experienceLevels: typeof searchParams?.experienceLevels === 'string' ? searchParams.experienceLevels : undefined,
     page: typeof searchParams?.page === 'string' ? parseInt(searchParams.page) || 1 : 1,
   }
 
