@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { CareerOpsMarkdown, CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
 import { useToast } from '@/components/ui/Toast'
+import { useApplyPrompt } from '@/hooks/useApplyPrompt'
+import { ApplyPromptPortal } from '@/components/ui/ApplyPromptPortal'
 
 interface EvaluatedJob {
   title: string
@@ -26,7 +28,7 @@ interface ResumeOption {
 interface EvaluateResult {
   job: EvaluatedJob
   report: CareerOpsReportData & { reportPath?: string | null; reportNumber?: number | null }
-  saved: { id: string; isNew: boolean }
+  saved: { id: string; isNew: boolean; resume?: { title: string; roleType: string } | null }
 }
 
 interface ResumesApiResponse {
@@ -66,6 +68,45 @@ export default function EvaluateJob() {
   const [resumes, setResumes] = useState<ResumeOption[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState('')
   const [resumesLoading, setResumesLoading] = useState(false)
+
+  // "Have you applied?" prompt state — tracks the job that was opened.
+  const [promptJobId, setPromptJobId] = useState<string | null>(null)
+  const [markingApplied, setMarkingApplied] = useState(false)
+  const { rememberPendingApply, clearPendingApply } = useApplyPrompt(result?.saved.id ?? '')
+
+  const handleClosePrompt = useCallback(() => {
+    clearPendingApply()
+    setPromptJobId(null)
+  }, [clearPendingApply])
+
+  const handleOpenPosting = () => {
+    rememberPendingApply()
+    setPromptJobId(result?.saved.id ?? '')
+  }
+  const handleMarkApplied = async () => {
+    if (!result) return
+    const resumeId = selectedResumeId || undefined
+    setMarkingApplied(true)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: result.saved.id, resumeId, status: 'APPLIED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast({ type: 'success', message: 'Marked as applied — tracking under Applications' })
+        clearPendingApply()
+        setPromptJobId(null)
+      } else {
+        toast({ type: 'error', message: data?.error || 'Failed to mark as applied' })
+      }
+    } catch {
+      toast({ type: 'error', message: 'Failed to mark as applied' })
+    } finally {
+      setMarkingApplied(false)
+    }
+  }
 
   const handleEvaluate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -384,6 +425,12 @@ export default function EvaluateJob() {
                   <p className="mt-0.5 text-sm text-primary-600 dark:text-primary-400 font-medium">
                     {result.job.company}
                   </p>
+                  {result.saved.resume && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <FileText className="w-3 h-3" aria-hidden="true" />
+                      Evaluated against <span className="font-medium text-gray-700 dark:text-gray-300">{result.saved.resume.title}</span> ({result.saved.resume.roleType})
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <Badge variant="success">
                       <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -400,7 +447,7 @@ export default function EvaluateJob() {
                     <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
                     View in Dashboard
                   </Link>
-                  <a href={result.job.applyUrl} target="_blank" rel="noopener noreferrer">
+                  <a href={result.job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={handleOpenPosting}>
                     <Button variant="outline" size="sm">
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
                       Open posting
@@ -749,6 +796,18 @@ export default function EvaluateJob() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* "Have you applied?" popup — shown when the user returns from the apply link on Evaluate Job */}
+      {promptJobId && result && (
+        <ApplyPromptPortal
+          isOpen={true}
+          jobTitle={result.job.title}
+          jobCompany={result.job.company}
+          onClose={handleClosePrompt}
+          onConfirm={handleMarkApplied}
+          confirming={markingApplied}
+        />
       )}
     </div>
   )

@@ -57,7 +57,6 @@ const ROLE_LABELS: Record<string, string> = {
   EMBEDDED: 'Embedded Engineer',
   SECURITY: 'Security Engineer',
   QA: 'QA Engineer',
-  PM: 'Product Manager',
   OTHER: 'Other',
 }
 

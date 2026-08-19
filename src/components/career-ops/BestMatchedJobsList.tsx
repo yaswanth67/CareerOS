@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { TailorResumeDrawer } from '@/components/dashboard/TailorResumeDrawer'
 import { useToast } from '@/components/ui/Toast'
 import { getScoreColor } from '@/lib/utils'
+import { useApplyPrompt } from '@/hooks/useApplyPrompt'
+import { ApplyPromptPortal } from '@/components/ui/ApplyPromptPortal'
 
 interface BestMatch {
   id: string
@@ -59,6 +61,9 @@ export function BestMatchedJobsList() {
   const [error, setError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [tailorJob, setTailorJob] = useState<{ id: string; title: string; company: string } | null>(null)
+  // The job the user clicked "Apply" on — used to show the "Have you applied?" popup
+  const [promptJobId, setPromptJobId] = useState<string | null>(null)
+  const [markingId, setMarkingId] = useState<string | null>(null)
 
   const fetchResumes = useCallback(async () => {
     setResumesLoading(true)
@@ -115,6 +120,9 @@ export function BestMatchedJobsList() {
 
   // Save the job so it's tracked under Applications. Uses the resume this match
   // was scored against, falling back to the most recent upload.
+  // Track the job that had "Apply" clicked for the "Have you applied?" prompt
+  const { rememberPendingApply, clearPendingApply } = useApplyPrompt(promptJobId ?? '')
+
   const handleSave = async (match: BestMatch) => {
     const resumeId = match.resume?.id ?? resumes[0]?.id
     if (!resumeId) {
@@ -139,6 +147,50 @@ export function BestMatchedJobsList() {
       toast({ type: 'error', message: 'Failed to save job' })
     } finally {
       setSavingId(null)
+    }
+  }
+
+  const handleApplyClick = (jobId: string, title: string, company: string) => {
+    // Remember this job so we can show the prompt when user returns
+    rememberPendingApply(jobId)
+    setPromptJobId(jobId)
+  }
+
+  // Close the "Have you applied?" popup. The prompt is rendered from the
+  // parent's `promptJobId` state (not the hook's internal flag), so clearing
+  // sessionStorage alone leaves it open — reset both here.
+  // Memoized so the portal always receives a stable reference.
+  const handleClosePrompt = useCallback(() => {
+    clearPendingApply()
+    setPromptJobId(null)
+  }, [clearPendingApply])
+
+  const handleMarkApplied = async (match: BestMatch) => {
+    const resumeId = match.resume?.id ?? resumes[0]?.id
+    if (!resumeId) {
+      toast({ type: 'error', message: 'Upload a resume first to track applications' })
+      return
+    }
+    setMarkingId(match.id)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: match.job.id, resumeId, status: 'APPLIED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast({ type: 'success', message: 'Marked as applied — tracking under Applications' })
+        clearPendingApply()
+        setPromptJobId(null)
+        router.refresh()
+      } else {
+        toast({ type: 'error', message: data?.error || 'Failed to mark as applied' })
+      }
+    } catch {
+      toast({ type: 'error', message: 'Failed to mark as applied' })
+    } finally {
+      setMarkingId(null)
     }
   }
 
@@ -250,6 +302,12 @@ export function BestMatchedJobsList() {
                       </Badge>
                     )}
                   </div>
+                  {match.resume && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <FileText className="w-3 h-3" aria-hidden="true" />
+                      Matched against <span className="font-medium text-gray-700 dark:text-gray-300">{match.resume.title}</span> ({match.resume.roleType})
+                    </p>
+                  )}
                   <p className="text-sm text-primary-600 dark:text-primary-400 truncate">{match.job.company}</p>
                   {(match.job.location || match.job.isRemote) && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5">
@@ -295,7 +353,10 @@ export function BestMatchedJobsList() {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => window.open(match.job.applyUrl ?? '', '_blank', 'noopener,noreferrer')}
+                      onClick={() => {
+                        handleApplyClick(match.job.id, match.job.title, match.job.company)
+                        window.open(match.job.applyUrl ?? '', '_blank', 'noopener,noreferrer')
+                      }}
                       title="Open application page"
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
@@ -330,6 +391,21 @@ export function BestMatchedJobsList() {
           job={tailorJob}
           defaultResumeId={selectedResumeId === 'all' ? undefined : selectedResumeId}
           onClose={() => setTailorJob(null)}
+        />
+      )}
+
+      {/* "Have you applied?" popup — shown when the user returns from the apply link on Best Matches */}
+      {promptJobId && (
+        <ApplyPromptPortal
+          isOpen={true}
+          jobTitle={matches.find(m => m.job.id === promptJobId)?.job.title ?? ''}
+          jobCompany={matches.find(m => m.job.id === promptJobId)?.job.company ?? ''}
+          onClose={handleClosePrompt}
+          onConfirm={() => {
+            const match = matches.find(m => m.job.id === promptJobId)
+            if (match) handleMarkApplied(match)
+          }}
+          confirming={markingId === promptJobId}
         />
       )}
     </div>

@@ -9,6 +9,9 @@ import { remotiveProvider } from '@/lib/job-providers/remotive'
 import { remoteokProvider } from '@/lib/job-providers/remoteok'
 import { arbeitnowProvider } from '@/lib/job-providers/arbeitnow'
 import { jobicyProvider } from '@/lib/job-providers/jobicy'
+import { hackerNewsProvider } from '@/lib/job-providers/hackernews'
+import { builtinProvider } from '@/lib/job-providers/builtin'
+import { diceProvider } from '@/lib/job-providers/dice'
 import { validateApplyUrl } from '@/lib/job-providers/base'
 import { findDuplicateJob, normalizeCompany } from '@/lib/job-fetcher/dedup'
 import { isUsJob, US_ONLY_WHERE } from '@/lib/geo/us-location'
@@ -23,6 +26,9 @@ export const providers = [
   remoteokProvider,
   arbeitnowProvider,
   jobicyProvider,
+  hackerNewsProvider,
+  builtinProvider,
+  diceProvider,
 ]
 
 export interface FetchResult {

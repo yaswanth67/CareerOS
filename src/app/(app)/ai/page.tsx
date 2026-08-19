@@ -14,7 +14,8 @@ export default async function AIPage({
   if (!user) redirect('/auth/signin')
 
   const params = await searchParams
-  const initialTab = params.tab === 'evaluate' ? 'evaluate' : 'suggestions'
+  const tabParam = params.tab as string | undefined
+  const initialTab = tabParam === 'evaluate' ? 'evaluate' : 'suggestions'
 
   return (
     <div className="space-y-6 animate-in">

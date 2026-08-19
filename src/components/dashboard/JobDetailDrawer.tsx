@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   X, MapPin, Building2, DollarSign, Clock, ExternalLink, Loader2, CheckCircle2,
@@ -14,6 +14,8 @@ import type { InterviewQuestionSet } from '@/types'
 import { CareerOpsReport, CareerOpsReportData } from '@/components/career-ops/CareerOpsReport'
 import { useToast } from '@/components/ui/Toast'
 import { DrawerPortal } from '@/components/ui/DrawerPortal'
+import { useApplyPrompt } from '@/hooks/useApplyPrompt'
+import { ApplyPromptPortal } from '@/components/ui/ApplyPromptPortal'
 
 // PENDING_APPLY_KEY must match JobCard so its "Have you applied?" portal fires
 // when the user returns from an apply link opened from this drawer.
@@ -140,6 +142,44 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
   const scrollRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
 
+  // "Have you applied?" prompt state — tracks the job that was opened.
+  const [promptJobId, setPromptJobId] = useState<string | null>(null)
+  const [markingApplied, setMarkingApplied] = useState(false)
+  const { rememberPendingApply, clearPendingApply } = useApplyPrompt(currentJob.id)
+
+  const handleClosePrompt = useCallback(() => {
+    clearPendingApply()
+    setPromptJobId(null)
+  }, [clearPendingApply])
+
+  const handleMarkApplied = async () => {
+    if (!defaultResumeId) {
+      toast({ type: 'error', message: 'Upload a resume first to track applications' })
+      return
+    }
+    setMarkingApplied(true)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: currentJob.id, resumeId: defaultResumeId, status: 'APPLIED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast({ type: 'success', message: 'Marked as applied — tracking under Applications' })
+        clearPendingApply()
+        setPromptJobId(null)
+        router.refresh()
+      } else {
+        toast({ type: 'error', message: data?.error || 'Failed to mark as applied' })
+      }
+    } catch {
+      toast({ type: 'error', message: 'Failed to mark as applied' })
+    } finally {
+      setMarkingApplied(false)
+    }
+  }
+
   const score = currentJob.match?.score ?? 0
   const hasMatch = !!currentJob.match && score > 0
   const hasMatchDetails = Boolean(currentJob.match) && (
@@ -172,14 +212,8 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
     if (currentJob.applyUrl) {
       window.open(currentJob.applyUrl, '_blank', 'noopener,noreferrer')
     }
-    try {
-      sessionStorage.setItem(
-        PENDING_APPLY_KEY,
-        JSON.stringify({ jobId: currentJob.id, title: currentJob.title, company: currentJob.company })
-      )
-    } catch {
-      // storage unavailable — the prompt just won't fire on return
-    }
+    rememberPendingApply()
+    setPromptJobId(currentJob.id)
     setApplying(true)
     setTimeout(() => setApplying(false), 800)
   }
@@ -326,8 +360,9 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
     : ''
 
   return (
-    <DrawerPortal>
-      {/* Backdrop */}
+    <Fragment>
+      <DrawerPortal>
+        {/* Backdrop */}
       <div
         className="fixed inset-0 z-50 bg-black/50 backdrop-enter backdrop-blur-sm"
         onClick={onClose}
@@ -629,5 +664,18 @@ export function JobDetailDrawer({ job, defaultResumeId, savedStatus, onClose }: 
         </div>
       </div>
     </DrawerPortal>
+
+    {/* "Have you applied?" popup — shown when the user returns from the apply link */}
+    {promptJobId && (
+      <ApplyPromptPortal
+        isOpen={true}
+        jobTitle={currentJob.title}
+        jobCompany={currentJob.company}
+        onClose={handleClosePrompt}
+        onConfirm={handleMarkApplied}
+        confirming={markingApplied}
+      />
+    )}
+  </Fragment>
   )
 }

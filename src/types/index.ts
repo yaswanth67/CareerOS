@@ -17,7 +17,6 @@ export type RoleType =
   | 'EMBEDDED'
   | 'SECURITY'
   | 'QA'
-  | 'PM'
   | 'OTHER'
 
 export type JobProvider =
@@ -30,6 +29,9 @@ export type JobProvider =
   | 'REMOTEOK'
   | 'ARBEITNOW'
   | 'JOBICY'
+  | 'HACKERNEWS'
+  | 'BUILTIN'
+  | 'DICE'
   | 'OTHER'
 
 export type ExperienceLevel = 'ENTRY' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'

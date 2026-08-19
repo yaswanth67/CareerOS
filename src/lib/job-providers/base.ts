@@ -212,9 +212,6 @@ export class BaseJobProvider implements JobProviderAdapter {
     if (lower.includes('qa') || lower.includes('quality') || lower.includes('test engineer')) {
       return 'QA'
     }
-    if (lower.includes('product manager') || lower.includes('pm ') || lower.includes('product owner')) {
-      return 'PM'
-    }
 
     return 'SDE'
   }

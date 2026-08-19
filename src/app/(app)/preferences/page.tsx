@@ -50,7 +50,6 @@ const roleOptions: { value: RoleType; label: string }[] = [
   { value: 'EMBEDDED', label: 'Embedded' },
   { value: 'SECURITY', label: 'Security' },
   { value: 'QA', label: 'QA' },
-  { value: 'PM', label: 'Product Manager' },
   { value: 'OTHER', label: 'Other' },
 ]
 

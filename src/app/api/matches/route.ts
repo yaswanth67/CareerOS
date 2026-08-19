@@ -163,8 +163,12 @@ export async function GET(request: NextRequest) {
     })
     const applicationStatusMap = new Map(applications.map(a => [a.jobId, a.status]))
 
+    // Filter out jobs that have been applied to (APPLIED status)
+    // These should only appear in the Applications page under "Applied"
+    const filteredMatches = matchesRaw.filter(match => applicationStatusMap.get(match.job.id) !== 'APPLIED')
+
     // Normalize JSON-string columns for the client
-    const matches = matchesRaw.map(match => ({
+    const matches = filteredMatches.map(match => ({
       ...match,
       matchedSkills: parseJsonArray(match.matchedSkills),
       missingSkills: parseJsonArray(match.missingSkills),

@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
     // Classify + upsert into the feed (provider OTHER, keyed by the URL) so the
     // evaluated job shows up on the Dashboard like any other job. Same helper
     // the Tools "Paste link" resolve route uses. Keep the response shape the
-    // client already expects ({ id, isNew }).
+    // client already expects ({ id, isNew, resume }).
     const { job: savedJob, isNew } = await upsertExtractedJob(extracted, url)
-    const saved = { id: savedJob.id, isNew }
+    const saved = { id: savedJob.id, isNew, resume: { title: resume.title, roleType: resume.roleType } }
 
     const report = await runEvaluation({
       job: {

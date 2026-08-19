@@ -222,7 +222,6 @@ function calculateRoleAlignment(resumeText: string, jobRoleType: string): number
     FULLSTACK: ['fullstack', 'full stack', 'end-to-end', 'frontend', 'backend', 'database', 'api'],
     MOBILE: ['mobile', 'ios', 'android', 'react native', 'flutter', 'swift', 'kotlin'],
     SECURITY: ['security', 'penetration', 'vulnerability', 'auth', 'encryption', 'compliance'],
-    PM: ['product', 'roadmap', 'stakeholder', 'agile', 'scrum', 'user research', 'metrics'],
   }
 
   const keywords = roleKeywords[jobRoleType] || []

@@ -43,7 +43,6 @@ const roleLabels: Record<RoleType, string> = {
   EMBEDDED: 'Embedded',
   SECURITY: 'Security',
   QA: 'QA',
-  PM: 'Product Manager',
   OTHER: 'Other',
 }
 

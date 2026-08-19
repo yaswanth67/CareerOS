@@ -3,13 +3,14 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { LayoutDashboard, FileText, Settings, ClipboardList, BarChart2, Star, Sparkles, Wrench } from 'lucide-react'
+import { LayoutDashboard, FileText, Settings, ClipboardList, BarChart2, Star, Sparkles, Wrench, MessagesSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Best Matches', href: '/matches', icon: Star },
   { name: 'AI Career', href: '/ai', icon: Sparkles },
+  { name: 'Chat Tools', href: '/chat', icon: MessagesSquare },
   { name: 'Resumes', href: '/resumes', icon: FileText },
   { name: 'Applications', href: '/applications', icon: ClipboardList },
   { name: 'Advanced AI tools', href: '/tools', icon: Wrench },

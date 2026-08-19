@@ -9,7 +9,7 @@ import EvaluateJob from './EvaluateJob'
 
 type TabId = 'suggestions' | 'evaluate'
 
-const TABS: { id: TabId; label: string; icon: typeof Search }[] = [
+const TABS: { id: TabId; label: string; icon: typeof Search | typeof Wand2 }[] = [
   { id: 'suggestions', label: 'Suggestions', icon: Wand2 },
   { id: 'evaluate', label: 'Evaluate a job', icon: Search },
 ]
@@ -19,8 +19,8 @@ const TABS: { id: TabId; label: string; icon: typeof Search }[] = [
  * paste a job posting for a full A–G evaluation. The active tab is mirrored in
  * the URL (?tab=evaluate) so it's shareable and browser-back friendly.
  *
- * Both components are ALWAYS mounted to preserve scan state and background scans
- * when switching between tabs. The inactive one is hidden with CSS.
+ * All components are ALWAYS mounted to preserve scan state and background scans
+ * when switching between tabs. The inactive ones are hidden with CSS.
  */
 export function AITabs({ initialTab }: { initialTab: TabId }) {
   const router = useRouter()
@@ -28,7 +28,11 @@ export function AITabs({ initialTab }: { initialTab: TabId }) {
 
   const select = (id: TabId) => {
     setTab(id)
-    router.replace(id === 'evaluate' ? '/ai?tab=evaluate' : '/ai', { scroll: false })
+    if (id === 'evaluate') {
+      router.replace('/ai?tab=evaluate', { scroll: false })
+    } else {
+      router.replace('/ai', { scroll: false })
+    }
   }
 
   return (
@@ -52,8 +56,8 @@ export function AITabs({ initialTab }: { initialTab: TabId }) {
         ))}
       </div>
 
-      {/* Both components always mounted to preserve scan state across tab switches.
-          The inactive one is hidden via CSS (display: none). */}
+      {/* All components always mounted to preserve scan state across tab switches.
+          The inactive ones are hidden via CSS (display: none). */}
       <div style={{ display: tab === 'suggestions' ? 'block' : 'none' }}>
         <ResumeSuggestions />
       </div>

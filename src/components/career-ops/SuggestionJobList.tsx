@@ -9,6 +9,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ExternalLink,
+  FileText,
   MapPin,
   RefreshCw,
   TrendingUp,
@@ -17,6 +18,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { getScoreColor } from '@/lib/utils'
+import { useApplyPrompt } from '@/hooks/useApplyPrompt'
+import { ApplyPromptPortal } from '@/components/ui/ApplyPromptPortal'
 
 export interface SuggestionJob {
   id: string
@@ -31,6 +34,8 @@ export interface SuggestionJob {
   score: number
   matchedSkills: string[]
   applicationStatus: string | null
+  /** The resume this job was matched against (from API response) */
+  resume?: { title: string; roleType: string } | null
 }
 
 interface ResumeJobsResponse {
@@ -100,6 +105,9 @@ export function SuggestionJobList({
   // Bumped once per fetch and folded into each row's key, so the entrance
   // animation replays on new results but not on an incidental re-render.
   const [fetchCount, setFetchCount] = useState(0)
+  // The job the user clicked "Apply" on — used to show the "Have you applied?" popup
+  const [promptJobId, setPromptJobId] = useState<string | null>(null)
+  const [markingId, setMarkingId] = useState<string | null>(null)
 
   const load = useCallback(
     async (refresh = false) => {
@@ -201,6 +209,47 @@ export function SuggestionJobList({
     }
   }
 
+  // For the "Have you applied?" prompt — track the job that was applied to.
+  const { rememberPendingApply, clearPendingApply } = useApplyPrompt(promptJobId ?? '')
+
+  const handleApplyClick = (jobId: string) => {
+    rememberPendingApply(jobId)
+    setPromptJobId(jobId)
+  }
+
+  // Close the "Have you applied?" popup. The prompt is rendered from the
+  // parent's `promptJobId` state (not the hook's internal flag), so clearing
+  // sessionStorage alone leaves it open — reset both here.
+  // Memoized so the portal always receives a stable reference.
+  const handleClosePrompt = useCallback(() => {
+    clearPendingApply()
+    setPromptJobId(null)
+  }, [clearPendingApply])
+
+  const handleMarkApplied = async (job: SuggestionJob) => {
+    setMarkingId(job.id)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, resumeId, status: 'APPLIED' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setSavedIds(prev => new Set(prev).add(job.id))
+        clearPendingApply()
+        setPromptJobId(null)
+        toast({ type: 'success', message: 'Marked as applied — tracking under Applications' })
+      } else {
+        toast({ type: 'error', message: data?.error || 'Failed to mark as applied' })
+      }
+    } catch {
+      toast({ type: 'error', message: 'Failed to mark as applied' })
+    } finally {
+      setMarkingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="mt-3 space-y-2" aria-busy="true" aria-label="Loading jobs">
@@ -294,6 +343,12 @@ export function SuggestionJobList({
                       {daysAgo(job.postedAt)}
                     </span>
                   </div>
+                  {job.resume && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <FileText className="w-3 h-3" aria-hidden="true" />
+                      Matched against <span className="font-medium text-gray-700 dark:text-gray-300">{job.resume.title}</span> ({job.resume.roleType})
+                    </p>
+                  )}
 
                   {job.matchedSkills.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
@@ -336,6 +391,7 @@ export function SuggestionJobList({
                     href={job.applyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => handleApplyClick(job.id)}
                     className="press-scale inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-500 text-white transition-colors hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                     title={`Opens the official posting on ${applyHost(job.applyUrl)}`}
                   >
@@ -353,6 +409,21 @@ export function SuggestionJobList({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* "Have you applied?" popup — shown when the user returns from the apply link on Role Suggestions */}
+      {promptJobId && (
+        <ApplyPromptPortal
+          isOpen={true}
+          jobTitle={jobs.find(j => j.id === promptJobId)?.title ?? ''}
+          jobCompany={jobs.find(j => j.id === promptJobId)?.company ?? ''}
+          onClose={handleClosePrompt}
+          onConfirm={() => {
+            const job = jobs.find(j => j.id === promptJobId)
+            if (job) handleMarkApplied(job)
+          }}
+          confirming={markingId === promptJobId}
+        />
       )}
 
     </div>

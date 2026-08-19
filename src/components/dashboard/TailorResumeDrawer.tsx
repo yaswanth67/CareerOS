@@ -1,13 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { AlertTriangle, Copy, Download, FileText, Loader2, RefreshCw, X } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CareerOpsMarkdown } from '@/components/career-ops/CareerOpsReport'
 import { useToast } from '@/components/ui/Toast'
-import { downloadFile } from '@/lib/utils'
 import { DrawerPortal } from '@/components/ui/DrawerPortal'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface TailorJob {
   id: string
@@ -36,6 +39,7 @@ interface TailorResult {
 export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResumeDrawerProps) {
   const [result, setResult] = useState<TailorResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [pdfGenerating, setPdfGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -81,19 +85,73 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
   }
 
   /**
-   * Save the tailored CV as a markdown file. Named after the company and role
+   * Save the tailored CV as a PDF file. Named after the company and role
    * so a folder of these stays sortable — tailoring for several jobs otherwise
    * produces a pile of identically named downloads.
    */
-  const downloadTailored = () => {
+  const downloadTailoredPdf = async () => {
     if (!result) return
-    const stem = `cv-${job.company}-${job.title}`
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80)
-    downloadFile(`${stem}.md`, result.markdown, 'text/markdown')
-    toast({ type: 'success', message: 'Tailored CV downloaded' })
+    setPdfGenerating(true)
+    let container: HTMLDivElement | null = null
+    let root: ReturnType<typeof createRoot> | null = null
+    try {
+      // Create off-screen container for rendering
+      container = document.createElement('div')
+      container.style.cssText = 'position: absolute; left: -9999px; top: 0; width: 800px; padding: 40px; background: white; font-family: system-ui, -apple-system, sans-serif; color: #111827;'
+      document.body.appendChild(container)
+
+      // Render markdown using CareerOpsMarkdown component
+      root = createRoot(container)
+      root.render(createElement(CareerOpsMarkdown, { markdown: result.markdown }))
+
+      // Wait for render and images/fonts to settle
+      await new Promise(r => setTimeout(r, 200))
+
+      // Capture with html2canvas
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      })
+
+      // Create PDF
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
+      const imgWidth = 210 // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = 0
+
+      const imgData = canvas.toDataURL('image/png')
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= 297 // A4 height in mm
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= 297
+      }
+
+      // Download
+      const stem = `cv-${job.company}-${job.title}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80)
+      pdf.save(`${stem}.pdf`)
+
+      toast({ type: 'success', message: 'Tailored CV downloaded as PDF' })
+    } catch (err) {
+      console.error('PDF generation failed:', err)
+      toast({ type: 'error', message: 'Failed to generate PDF — try again' })
+    } finally {
+      // Cleanup
+      if (root) root.unmount()
+      if (container) container.remove()
+      setPdfGenerating(false)
+    }
   }
 
   return (
@@ -168,8 +226,8 @@ export function TailorResumeDrawer({ job, defaultResumeId, onClose }: TailorResu
                   <Button variant="ghost" size="sm" onClick={copyTailored}>
                     <Copy className="w-3.5 h-3.5 mr-1" /> Copy
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={downloadTailored}>
-                    <Download className="w-3.5 h-3.5 mr-1" /> Download
+                  <Button variant="ghost" size="sm" onClick={downloadTailoredPdf} disabled={pdfGenerating} isLoading={pdfGenerating}>
+                    <Download className="w-3.5 h-3.5 mr-1" /> Download PDF
                   </Button>
                   <Button variant="ghost" size="sm" onClick={generate} disabled={loading}>
                     <RefreshCw className="w-3.5 h-3.5 mr-1" /> Regenerate

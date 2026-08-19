@@ -152,6 +152,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    const resumeInfo = { id: resume.id, title: resume.title, roleType: resume.roleType }
+
     const scores = await batchScoreJobsHeuristic(
       resume.parsedText,
       parseJsonArray<string>(resume.skills),
@@ -202,8 +204,11 @@ export async function POST(request: NextRequest) {
           matchedSkills: match?.matchedSkills ?? [],
           missingSkills: match?.missingSkills ?? [],
           applicationStatus: job.applications[0]?.status ?? null,
+          resume: resumeInfo,
         }
       })
+      // Filter out jobs the user has already applied to — they belong in Applications
+      .filter(job => job.applicationStatus !== 'APPLIED')
       .filter(job => job.score >= minScore)
       .sort((a, b) => b.rank - a.rank || Date.parse(b.postedAt) - Date.parse(a.postedAt))
       .slice(0, limit)
@@ -212,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       keywords,
-      resume: { id: resume.id, title: resume.title },
+      resume: { id: resume.id, title: resume.title, roleType: resume.roleType },
       jobs,
       poolSize: pool.length,
       refreshed,

@@ -5,6 +5,7 @@ import { StatsCards } from '@/components/dashboard/StatsCards'
 import { JobList } from '@/components/dashboard/JobList'
 import { ActiveFilters } from '@/components/dashboard/ActiveFilters'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
+import { LinkedInBookmarks } from '@/components/dashboard/LinkedInBookmarks'
 import { getJobStats } from '@/lib/job-fetcher'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
@@ -45,6 +46,7 @@ export default async function DashboardPage({
         }}
       />
       <ActiveFilters />
+      <LinkedInBookmarks />
       <Suspense fallback={<DashboardSkeleton />}>
         <JobList searchParams={params} />
       </Suspense>
