@@ -119,14 +119,33 @@ async function getJobs(filters: JobListFilters) {
     })
   }
 
-  // Excluded keywords are matched against the job title only. Matching the
-  // description too would drop nearly everything — a mid-level posting routinely
-  // mentions "senior" engineers you'd work with.
-  const excluded = filters.exclude?.split(',').map(k => k.trim()).filter(Boolean) ?? []
+  // Excluded keywords are matched against the job title AND experience level.
+  // A mid-level posting routinely mentions "senior" engineers you'd work with,
+  // so we check title only for general keywords. But for experience level terms
+  // (senior, staff, principal, entry, mid), we also filter the experienceLevel field.
+  const excluded = filters.exclude?.split(',').map(k => k.trim().toLowerCase()).filter(Boolean) ?? []
   if (excluded.length) {
-    andConditions.push({
-      NOT: { OR: excluded.map(keyword => ({ title: { contains: keyword } })) },
-    })
+    const experienceLevelKeywords = ['entry', 'mid', 'senior', 'staff', 'principal']
+    const excludedExperienceLevels = excluded.filter(k => experienceLevelKeywords.includes(k))
+    const excludedTitleKeywords = excluded.filter(k => !experienceLevelKeywords.includes(k))
+
+    const notConditions: Prisma.JobWhereInput[] = []
+
+    if (excludedTitleKeywords.length) {
+      notConditions.push({
+        OR: excludedTitleKeywords.map(keyword => ({ title: { contains: keyword } })),
+      })
+    }
+
+    if (excludedExperienceLevels.length) {
+      notConditions.push({
+        experienceLevel: { in: excludedExperienceLevels.map(k => k.toUpperCase() as ExperienceLevel) },
+      })
+    }
+
+    if (notConditions.length) {
+      andConditions.push({ NOT: { OR: notConditions } })
+    }
   }
 
   // Minimum salary — a job qualifies when either end of its published range
