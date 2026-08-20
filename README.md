@@ -33,6 +33,7 @@ Built with Next.js 16 (App Router), Prisma + SQLite, NextAuth, and the **Anthrop
 | 11 | **Level-aware ranking** | Seniority is read from the job title, and matches are ranked against **your** level — an exact-level role outranks a senior one with the same skill overlap, so a mid-level candidate doesn't get a feed full of Staff roles |
 | 12 | **Role suggestions** | Scans your resume and proposes adjacent job titles at your level, then shows **real US postings** for each one, scored against your resume and linking to the employer's own application page |
 | 13 | **AI Career toolkit** | Open any saved job and get the full [career-ops](https://career-ops.org) methodology against it: fit report, tailored CV, cover letter, five email variants (HR, cold outreach, referral request, stalled process, no-show), LinkedIn note, interview prep, follow-up plan and an upskill map — each copyable and downloadable |
+| 14 | **Chat Tools** | The `/chat` hub holds two conversational assistants: **LinkedIn Assistant** writes a personalized outreach / connection note from a profile URL (referral, casual, or 300-char connection request), and **Interview Chat** lets you practice role-aware interview answers grounded in your resume, then generate a cover letter or an ATS-optimized fast resume (PDF / Word) |
 
 ### How the AI connection works
 
@@ -89,6 +90,37 @@ A scan runs for minutes, so it is **not owned by the page**: the request is park
 | Upskill | Skill gaps across your pipeline, weighted by frequency |
 
 Each result is copyable and downloadable as markdown. Results are cached per mode for the life of the drawer, so switching tabs doesn't re-spend minutes of model time. A resume-version picker applies to every mode.
+
+---
+
+## Chat Tools (`/chat`)
+
+Two conversational assistants live on their own page so they're easy to find and use. The active tab is mirrored in the URL (`?tab=linkedin` / `?tab=chat`) so it's shareable and browser-back friendly.
+
+### LinkedIn Assistant
+
+Paste a **LinkedIn profile URL** (and optionally a **job URL** for referral context) and pick a message type. The assistant reads the recruiter's profile and writes a first-person note for you — **draft only, nothing is sent**.
+
+| Type | What it produces |
+|------|------------------|
+| Referral Request | Ask for a referral to a specific role (uses the job URL for context) |
+| Casual Chat | Networking / coffee-chat or informational-interview message |
+| Connection Request | Personalized connection note (300 chars max) |
+
+The result renders as markdown and is copyable. The profile preview (name, headline, company, location) shows what the message was grounded in.
+
+### Interview Chat
+
+Set a **target job role** and pick a **resume version**, then ask interview questions. The whole conversation is sent on every turn so the assistant keeps context, and your resume + role are re-injected server-side via the system prompt — answers stay framed for the role and grounded in your experience.
+
+| Action | What it produces |
+|--------|------------------|
+| Ask a question | A role-aware interview answer (renders as markdown) |
+| Recommend Best Resume | Scores every resume against the role (0–5) and auto-selects the top one (shown when you have 2+ resumes) |
+| Generate Cover Letter | A tailored cover letter from the conversation so far — downloadable as PDF |
+| Fast Resume | An ATS-optimized resume rewritten for the role — downloadable as **PDF** or **Word (.docx)** |
+
+Suggested opening questions are offered when the chat is empty. All calls use the local Claude connection — expect 30–90s per turn.
 
 ---
 
@@ -285,6 +317,7 @@ What to do:
 | `/auth/signin`, `/auth/register` | Credentials auth |
 | `/dashboard` | Stats cards + full-width vertical job feed. Filters are URL-driven (`/dashboard?q=…&posted=48`) so they survive tab switches and can be bookmarked/shared. Applied jobs are hidden from the feed |
 | `/matches` | Jobs sorted by match score, with a threshold slider and a resume picker. **Tailor CV** opens per job |
+| `/chat` | **Chat Tools hub** — LinkedIn Assistant (personalized outreach, connection requests) and Interview Chat (role-aware interview practice, cover letter generation, fast resume). Uses local Claude connection — expect 30–90s per call |
 | `/ai` | AI Career — role suggestions, job evaluation, and the resume-driven tools in one place |
 | `/suggestions`, `/evaluate` | Direct entry points to the tabs on `/ai` |
 | `/analytics` | Pipeline stats and insights |
@@ -380,6 +413,19 @@ Every route runs the vendored career-ops methodology through the local Claude co
 | POST | `/api/career-ops/upskill` | Weighted skill gaps across your pipeline |
 | POST | `/api/jobs/[id]/career-ops` | Evaluate a saved job by id |
 | GET | `/api/career-ops/report?path=` | Serve a saved report file (path-traversal guarded) |
+
+### Chat Tools
+
+The `/chat` page endpoints run through the local Claude connection (faster than career-ops — expect 30–90s per call). All accept an optional `resumeId` (omit → newest resume), a `jobRole` (required for interview chat), and either messages or URLs.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/career-ops/chat` | Interview-prep turn. Body: `{jobRole, resumeId?, messages: [{role, content}]}`. Returns `{reply}` — the full conversation is echoed back each turn so the assistant keeps context |
+| POST | `/api/career-ops/chat-cover` | Cover letter from the interview conversation. Body: `{jobRole, resumeId?, messages[]}`. Returns `{coverLetter}` |
+| POST | `/api/career-ops/recommend-resume` | Scores resumes against a role. Body: `{jobRole, resumeIds[]}`. Returns `{recommended: {resumeId, title, score, reason}, allScores[]}` |
+| POST | `/api/career-ops/fast-resume` | ATS-optimized resume for the role. Body: `{jobRole, resumeId?, jobDescription?}`. Returns `{markdown}` (download as PDF / Word) |
+| POST | `/api/career-ops/linkedin-message` | LinkedIn outreach from a profile URL (+ optional job URL). Body: `{profileUrl, jobUrl?, type: 'referral'\|'casual'\|'connection'}`. Returns `{markdown}` |
+| GET | `/api/resumes/list` | Resume picker list (`{resumes: [{id, title, updatedAt}]}`) for the chat tools |
 
 ### Cron
 | Method | Endpoint | Description |
